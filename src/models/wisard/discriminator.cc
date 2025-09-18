@@ -182,6 +182,36 @@ public:
     rams.clear();
   }
 
+  void addRuleRAM(const std::vector<int>& variableIndexes, const std::vector<int>& ruleValues, int alpha, int base = 2, bool ignoreZero = false){
+    if(variableIndexes.size() != ruleValues.size()){
+      throw Exception("The size of variableIndexes and ruleValues must match!");
+    }
+    checkBase(base);
+    // Ensure entry size supports these indexes
+    int maxIndex = -1;
+    for(unsigned int i=0; i<variableIndexes.size(); i++){
+      if(variableIndexes[i] > maxIndex) maxIndex = variableIndexes[i];
+    }
+    if(entrySize <= maxIndex){
+      throw Exception("Rule uses indexes greater than discriminator entry size!");
+    }
+
+    RAM r(variableIndexes, ignoreZero, base);
+    // Compute index from ruleValues in the provided order (base-encoded)
+    addr_t index = 0;
+    addr_t p = 1;
+    for(unsigned int i=0; i<ruleValues.size(); i++){
+      int v = ruleValues[i];
+      if(v < 0 || v >= base){
+        throw Exception("Rule value is out of range for the selected base!");
+      }
+      index += (addr_t)v * p;
+      p *= base;
+    }
+    r.setCountAtAddress(index, (content_t)alpha);
+    rams.push_back(r);
+  }
+
   void addRuleRAM(const std::vector<int>& variableIndexes, const std::vector<std::vector<int>>& multipleRuleValues, int alpha, int base = 2, bool ignoreZero = false){
     if(multipleRuleValues.empty()){
       throw Exception("multipleRuleValues cannot be empty!");
@@ -196,11 +226,13 @@ public:
       throw Exception("Rule uses indexes greater than discriminator entry size!");
     }
 
+    // Create a single RAM for all rule values
     RAM r(variableIndexes, ignoreZero, base);
     
-    // For each ruleValues combination, compute the address and set alpha
+    // Process each rule value set
     for(unsigned int ruleIdx = 0; ruleIdx < multipleRuleValues.size(); ruleIdx++){
       const std::vector<int>& ruleValues = multipleRuleValues[ruleIdx];
+      
       if(variableIndexes.size() != ruleValues.size()){
         throw Exception("The size of variableIndexes and ruleValues must match for each rule!");
       }

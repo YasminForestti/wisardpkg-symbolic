@@ -83,6 +83,10 @@ public:
     return _pyClassifyWithRules<DataSet>(images);
   }
 
+  void add_rule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<int>& ruleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
+    addRule(label, variableIndexes, ruleValues, alpha, basein, ignoreZeroIn);
+  }
+
   void add_rule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<std::vector<int>>& multipleRuleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
     addRule(label, variableIndexes, multipleRuleValues, alpha, basein, ignoreZeroIn);
   }

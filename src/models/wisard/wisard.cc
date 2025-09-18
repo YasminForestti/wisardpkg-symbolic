@@ -163,6 +163,21 @@ public:
   }
 
 
+  void addRule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<int>& ruleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
+    if(discriminators.find(label) == discriminators.end()){
+      int inferredEntrySize = 0;
+      if(variableIndexes.size() > 0){
+        inferredEntrySize = *std::max_element(variableIndexes.begin(), variableIndexes.end()) + 1;
+      }
+      // Garantir que entrySize seja pelo menos addressSize
+      if(inferredEntrySize < addressSize){
+        inferredEntrySize = addressSize;
+      }
+      discriminators[label] = Discriminator(inferredEntrySize);
+    }
+    discriminators[label].addRuleRAM(variableIndexes, ruleValues, alpha, basein, ignoreZeroIn);
+  }
+
   void addRule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<std::vector<int>>& multipleRuleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
     if(discriminators.find(label) == discriminators.end()){
       int inferredEntrySize = 0;
