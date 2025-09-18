@@ -28,6 +28,14 @@ public:
     return getVote<BinInput>(image);
   }
 
+  int getVoteWithRules(const std::vector<int>& image){
+    return getVoteWithRules<std::vector<int>>(image);
+  }
+
+  int getVoteWithRules(const BinInput& image){
+    return getVoteWithRules<BinInput>(image);
+  }
+
   void train(const std::vector<int>& image){
     train<std::vector<int>>(image);
   }
@@ -101,6 +109,27 @@ public:
     return size;
   }
 
+  void setCountAtAddress(addr_t index, content_t value){
+    positions[index] = value;
+  }
+
+  std::string getRAMInfo(){
+    std::string info = "RAM addresses: [";
+    for(unsigned int i=0; i<addresses.size(); i++){
+      if(i > 0) info += ", ";
+      info += std::to_string(addresses[i]);
+    }
+    info += "]\n";
+    
+    info += "Stored positions:\n";
+    for(auto it=positions.begin(); it!=positions.end(); ++it){
+      if(it->second > 0){
+        info += "  Address " + std::to_string(it->first) + ": count=" + std::to_string(it->second) + "\n";
+      }
+    }
+    return info;
+  }
+
   ~RAM(){
     addresses.clear();
     positions.clear();
@@ -134,6 +163,25 @@ protected:
 
   template<typename T>
   int getVote(const T& image){
+    addr_t index = getIndex<T>(image);
+    if(ignoreZero && index == 0)
+      return 0;
+    auto it = positions.find(index);
+    if(it == positions.end()){
+      return 0;
+    }
+    else{
+      return it->second;
+    }
+  }
+
+  template<typename T>
+  int getVoteWithRules(const T& image){
+    // Verifica se a imagem tem tamanho suficiente para os endereços da RAM
+    if(image.size() <= *std::max_element(addresses.begin(), addresses.end())){
+      return 0; // Retorna 0 se a imagem for muito pequena
+    }
+    
     addr_t index = getIndex<T>(image);
     if(ignoreZero && index == 0)
       return 0;

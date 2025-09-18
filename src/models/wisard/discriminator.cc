@@ -69,6 +69,14 @@ public:
     return _classify<BinInput>(image);
   }
 
+  std::vector<int> classify_with_rules(const std::vector<int>& image) {
+    return _classify_with_rules<std::vector<int>>(image);
+  }
+
+  std::vector<int> classify_with_rules(const BinInput& image) {
+    return _classify_with_rules<BinInput>(image);
+  }
+
   void train(const std::vector<int>& image){
     train<std::vector<int>>(image);
   }
@@ -160,8 +168,57 @@ public:
     return size;
   }
 
+  std::string getRAMSInfo(){
+    std::string info = "Discriminator has " + std::to_string(rams.size()) + " RAMs:\n";
+    for(unsigned int i=0; i<rams.size(); i++){
+      info += "RAM " + std::to_string(i) + ":\n";
+      info += rams[i].getRAMInfo();
+      info += "\n";
+    }
+    return info;
+  }
+
   ~Discriminator(){
     rams.clear();
+  }
+
+  void addRuleRAM(const std::vector<int>& variableIndexes, const std::vector<std::vector<int>>& multipleRuleValues, int alpha, int base = 2, bool ignoreZero = false){
+    if(multipleRuleValues.empty()){
+      throw Exception("multipleRuleValues cannot be empty!");
+    }
+    checkBase(base);
+    // Ensure entry size supports these indexes
+    int maxIndex = -1;
+    for(unsigned int i=0; i<variableIndexes.size(); i++){
+      if(variableIndexes[i] > maxIndex) maxIndex = variableIndexes[i];
+    }
+    if(entrySize <= maxIndex){
+      throw Exception("Rule uses indexes greater than discriminator entry size!");
+    }
+
+    RAM r(variableIndexes, ignoreZero, base);
+    
+    // For each ruleValues combination, compute the address and set alpha
+    for(unsigned int ruleIdx = 0; ruleIdx < multipleRuleValues.size(); ruleIdx++){
+      const std::vector<int>& ruleValues = multipleRuleValues[ruleIdx];
+      if(variableIndexes.size() != ruleValues.size()){
+        throw Exception("The size of variableIndexes and ruleValues must match for each rule!");
+      }
+      
+      // Compute index from ruleValues in the provided order (base-encoded)
+      addr_t index = 0;
+      addr_t p = 1;
+      for(unsigned int i=0; i<ruleValues.size(); i++){
+        int v = ruleValues[i];
+        if(v < 0 || v >= base){
+          throw Exception("Rule value is out of range for the selected base!");
+        }
+        index += (addr_t)v * p;
+        p *= base;
+      }
+      r.setCountAtAddress(index, (content_t)alpha);
+    }
+    rams.push_back(r);
   }
 
 protected:
@@ -286,6 +343,16 @@ protected:
     std::vector<int> votes(rams.size());
     for(unsigned int i=0; i<rams.size(); i++){
       votes[i] = rams[i].getVote(image);
+    }
+    return votes;
+  }
+
+  template<typename T>
+  std::vector<int> _classify_with_rules(const T& image) {
+    // Não verifica entrySize para permitir RAMs de tamanhos variados
+    std::vector<int> votes(rams.size());
+    for(unsigned int i=0; i<rams.size(); i++){
+      votes[i] = rams[i].getVoteWithRules(image);
     }
     return votes;
   }

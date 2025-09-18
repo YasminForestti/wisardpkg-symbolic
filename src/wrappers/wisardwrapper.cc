@@ -75,6 +75,22 @@ public:
     return _pyClassify<DataSet>(images);
   }
 
+  py::list pyClassifyWithRules(const std::vector<std::vector<int>>& images){
+    return _pyClassifyWithRules<std::vector<std::vector<int>>>(images);
+  }
+
+  py::list pyClassifyWithRules(const DataSet& images){
+    return _pyClassifyWithRules<DataSet>(images);
+  }
+
+  void add_rule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<std::vector<int>>& multipleRuleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
+    addRule(label, variableIndexes, multipleRuleValues, alpha, basein, ignoreZeroIn);
+  }
+
+  std::string get_rams_info(){
+    return getRAMSInfo();
+  }
+
 protected:
   py::list getClassesDegrees(std::map<std::string, int> candidates) const{
     float total = 0;
@@ -97,6 +113,22 @@ protected:
     for(unsigned int i=0; i<images.size(); i++){
       if(verbose) std::cout << "\rclassifying " << i+1 << " of " << images.size();
       std::map<std::string,int> candidates = classify(images[i],searchBestConfidence);
+      std::string aClass = Bleaching::getBiggestCandidate(candidates);
+      setClassifyOutput(labels, i, aClass, numberOfRAMS, candidates);
+    }
+    if(verbose) std::cout << "\r" << std::endl;
+    return labels;
+  }
+
+  template<typename T>
+  py::list _pyClassifyWithRules(const T& images){
+    // Para classify_with_rules, não calculamos numberOfRAMS fixo pois RAMs podem ter tamanhos variados
+    float numberOfRAMS = 1.0; // Valor padrão
+
+    py::list labels(images.size());
+    for(unsigned int i=0; i<images.size(); i++){
+      if(verbose) std::cout << "\rclassifying with rules " << i+1 << " of " << images.size();
+      std::map<std::string,int> candidates = classify_with_rules_single(images[i], searchBestConfidence);
       std::string aClass = Bleaching::getBiggestCandidate(candidates);
       setClassifyOutput(labels, i, aClass, numberOfRAMS, candidates);
     }

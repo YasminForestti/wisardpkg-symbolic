@@ -101,6 +101,14 @@ public:
     return _classify<DataSet>(images);
   }
 
+  std::vector<std::string> classify_with_rules(const std::vector<std::vector<int>>& images){
+    return _classify_with_rules<std::vector<std::vector<int>>>(images);
+  }
+
+  std::vector<std::string> classify_with_rules(const DataSet& images){
+    return _classify_with_rules<DataSet>(images);
+  }
+
   void leaveOneOut(const std::vector<int>& image, const std::string& label){
     auto d = discriminators.find(label);
     if(d != discriminators.end()){
@@ -125,6 +133,17 @@ public:
     return images;
   }
 
+  std::string getRAMSInfo(){
+    std::string info = "WiSARD RAMs Information:\n";
+    info += "========================\n";
+    for(std::map<std::string, Discriminator>::iterator d=discriminators.begin(); d!=discriminators.end(); ++d){
+      info += "Class: " + d->first + "\n";
+      info += d->second.getRAMSInfo();
+      info += "========================\n";
+    }
+    return info;
+  }
+
   std::string jsonConfig(){
     nl::json config = getConfig();
     config["classes"] = getConfigClassesJSON();
@@ -141,6 +160,22 @@ public:
   }
   std::string json() {
     return json(false,"");
+  }
+
+
+  void addRule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<std::vector<int>>& multipleRuleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
+    if(discriminators.find(label) == discriminators.end()){
+      int inferredEntrySize = 0;
+      if(variableIndexes.size() > 0){
+        inferredEntrySize = *std::max_element(variableIndexes.begin(), variableIndexes.end()) + 1;
+      }
+      // Garantir que entrySize seja pelo menos addressSize
+      if(inferredEntrySize < addressSize){
+        inferredEntrySize = addressSize;
+      }
+      discriminators[label] = Discriminator(inferredEntrySize);
+    }
+    discriminators[label].addRuleRAM(variableIndexes, multipleRuleValues, alpha, basein, ignoreZeroIn);
   }
 
 
@@ -167,6 +202,19 @@ protected:
     return labels;
   }
 
+  template<typename T>
+  std::vector<std::string> _classify_with_rules(const T& images){
+    std::vector<std::string> labels(images.size());
+
+    for(unsigned int i=0; i<images.size(); i++){
+      if(verbose) std::cout << "\rclassifying with rules " << i+1 << " of " << images.size();
+      std::map<std::string,int> candidates = classify_with_rules_single(images[i], searchBestConfidence);
+      labels[i] = Bleaching::getBiggestCandidate(candidates);
+    }
+    if(verbose) std::cout << "\r" << std::endl;
+    return labels;
+  }
+
   std::map<std::string, int> classify(const std::vector<int>& image, bool searchBestConfidence=false){
     return __classify<std::vector<int>>(image,searchBestConfidence);
   }
@@ -175,12 +223,30 @@ protected:
     return __classify<BinInput>(image,searchBestConfidence);
   }
 
+  std::map<std::string, int> classify_with_rules_single(const std::vector<int>& image, bool searchBestConfidence=false){
+    return __classify_with_rules<std::vector<int>>(image, searchBestConfidence);
+  }
+
+  std::map<std::string, int> classify_with_rules_single(const BinInput& image, bool searchBestConfidence=false){
+    return __classify_with_rules<BinInput>(image, searchBestConfidence);
+  }
+
   template<typename T>
   std::map<std::string, int> __classify(const T& image, bool searchBestConfidence=false){
     std::map<std::string,std::vector<int>> allvotes;
 
     for(std::map<std::string,Discriminator>::iterator i=discriminators.begin(); i!=discriminators.end(); ++i){
       allvotes[i->first] = i->second.classify(image);
+    }
+    return Bleaching::make(allvotes, bleachingActivated, searchBestConfidence, confidence);
+  }
+
+  template<typename T>
+  std::map<std::string, int> __classify_with_rules(const T& image, bool searchBestConfidence=false){
+    std::map<std::string,std::vector<int>> allvotes;
+
+    for(std::map<std::string,Discriminator>::iterator i=discriminators.begin(); i!=discriminators.end(); ++i){
+      allvotes[i->first] = i->second.classify_with_rules(image);
     }
     return Bleaching::make(allvotes, bleachingActivated, searchBestConfidence, confidence);
   }
