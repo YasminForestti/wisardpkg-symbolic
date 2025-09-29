@@ -1,4 +1,233 @@
 
+// Enum para representar os tipos de token
+enum TokenType {
+    VARIABLE,
+    OPERATOR,
+    PARENTHESIS
+};
+
+// Estrutura para um token
+struct Token {
+    std::string value;
+    TokenType type;
+};
+
+class RuleCompiler {
+public:
+    // Construtor
+    RuleCompiler() {}
+    
+    // Compila uma regra booleana e retorna todas as combinações que a tornam verdadeira
+    std::vector<std::vector<int>> compileRule(const std::string& rule, const std::map<std::string, int>& variableIndexes);
+    
+private:
+    // Função para verificar se um caractere é parte de um nome de variável
+    bool isVariableChar(char c);
+    
+    // Tokeniza a string de expressão
+    std::vector<Token> tokenize(const std::string& expression);
+    
+    // Precedência dos operadores
+    int precedence(const std::string& op);
+    
+    // Converte a lista de tokens para notação pós-fixa (RPN)
+    std::vector<Token> infixToPostfix(const std::vector<Token>& infixTokens);
+    
+    // Avalia a expressão em notação pós-fixa
+    bool evaluatePostfix(const std::vector<Token>& postfixTokens, const std::map<std::string, bool>& values);
+    
+    // Gera todas as combinações possíveis de valores para as variáveis
+    std::vector<std::map<std::string, bool>> generateAllCombinations(const std::vector<std::string>& variables);
+};
+
+bool RuleCompiler::isVariableChar(char c) {
+    return isalnum(c) || c == '_';
+}
+
+std::vector<Token> RuleCompiler::tokenize(const std::string& expression) {
+    std::vector<Token> tokens;
+    for (size_t i = 0; i < expression.length(); ) {
+        char c = expression[i];
+        if (isspace(c)) {
+            i++;
+            continue;
+        }
+
+        if (c == '+' || c == '*' || c == '!') {
+            tokens.push_back({std::string(1, c), OPERATOR});
+            i++;
+        } else if (c == '(' || c == ')') {
+            tokens.push_back({std::string(1, c), PARENTHESIS});
+            i++;
+        } else if (isalpha(c) || c == '_') {
+            std::string varName = "";
+            while (i < expression.length() && isVariableChar(expression[i])) {
+                varName += expression[i];
+                i++;
+            }
+            tokens.push_back({varName, VARIABLE});
+        } else {
+            // Caractere desconhecido
+            throw Exception(("Caractere invalido na expressao: " + std::string(1, c)).c_str());
+        }
+    }
+    return tokens;
+}
+
+int RuleCompiler::precedence(const std::string& op) {
+    if (op == "!") return 3;
+    if (op == "*") return 2;
+    if (op == "+") return 1;
+    return 0;
+}
+
+std::vector<Token> RuleCompiler::infixToPostfix(const std::vector<Token>& infixTokens) {
+    std::vector<Token> postfixTokens;
+    std::stack<Token> opStack;
+
+    for (const auto& token : infixTokens) {
+        if (token.type == VARIABLE) {
+            postfixTokens.push_back(token);
+        } else if (token.value == "(") {
+            opStack.push(token);
+        } else if (token.value == ")") {
+            while (!opStack.empty() && opStack.top().value != "(") {
+                postfixTokens.push_back(opStack.top());
+                opStack.pop();
+            }
+            if (!opStack.empty()) opStack.pop(); // Remove o '('
+        } else if (token.type == OPERATOR) {
+            while (!opStack.empty() && opStack.top().type == OPERATOR && precedence(opStack.top().value) >= precedence(token.value)) {
+                postfixTokens.push_back(opStack.top());
+                opStack.pop();
+            }
+            opStack.push(token);
+        }
+    }
+
+    while (!opStack.empty()) {
+        postfixTokens.push_back(opStack.top());
+        opStack.pop();
+    }
+    return postfixTokens;
+}
+
+bool RuleCompiler::evaluatePostfix(const std::vector<Token>& postfixTokens, const std::map<std::string, bool>& values) {
+    std::stack<bool> operandStack;
+
+    for (const auto& token : postfixTokens) {
+        if (token.type == VARIABLE) {
+            if (values.count(token.value)) {
+                operandStack.push(values.at(token.value));
+            } else {
+                throw Exception(("Variavel nao encontrada: " + token.value).c_str());
+            }
+        } else if (token.value == "!") {
+            if (operandStack.empty()) { 
+                throw Exception("Erro de expressao (NOT)."); 
+            }
+            bool val = operandStack.top();
+            operandStack.pop();
+            operandStack.push(!val);
+        } else if (token.value == "*" || token.value == "+") {
+            if (operandStack.size() < 2) { 
+                throw Exception(("Erro de expressao (" + token.value + ").").c_str()); 
+            }
+            bool right = operandStack.top();
+            operandStack.pop();
+            bool left = operandStack.top();
+            operandStack.pop();
+
+            if (token.value == "*") { // AND
+                operandStack.push(left && right);
+            } else { // OR
+                operandStack.push(left || right);
+            }
+        }
+    }
+
+    if (operandStack.size() != 1) { 
+        throw Exception("Erro de expressao final."); 
+    }
+    return operandStack.top();
+}
+
+std::vector<std::map<std::string, bool>> RuleCompiler::generateAllCombinations(const std::vector<std::string>& variables) {
+    std::vector<std::map<std::string, bool>> combinations;
+    int numVariables = variables.size();
+    int numCombinations = 1 << numVariables;
+
+    for (int i = 0; i < numCombinations; ++i) {
+        std::map<std::string, bool> combination;
+        for (int j = 0; j < numVariables; ++j) {
+            bool value = (i >> j) & 1;
+            combination[variables[j]] = value;
+        }
+        combinations.push_back(combination);
+    }
+    return combinations;
+}
+
+std::vector<std::vector<int>> RuleCompiler::compileRule(const std::string& rule, const std::map<std::string, int>& variableIndexes) {
+    // Etapa 1: Tokenização
+    std::vector<Token> infixTokens = tokenize(rule);
+
+    // Etapa 2: Encontrar as variáveis na regra
+    std::vector<std::string> variables;
+    for (const auto& token : infixTokens) {
+        if (token.type == VARIABLE) {
+            bool found = false;
+            for(const auto& var : variables) {
+                if(var == token.value) {
+                    found = true;
+                    break;
+                }
+            }
+            if(!found) {
+                // Verificar se a variável existe no variableIndexes
+                if (variableIndexes.find(token.value) == variableIndexes.end()) {
+                    throw Exception(("Variavel '" + token.value + "' nao encontrada no variableIndexes").c_str());
+                }
+                variables.push_back(token.value);
+            }
+        }
+    }
+    std::sort(variables.begin(), variables.end());
+
+    // Etapa 3: Converter para notação pós-fixa
+    std::vector<Token> postfixTokens = infixToPostfix(infixTokens);
+
+    // Etapa 4: Gerar todas as combinações
+    std::vector<std::map<std::string, bool>> allCombinations = generateAllCombinations(variables);
+
+    // Etapa 5: Avaliar cada combinação e coletar as que tornam a regra verdadeira
+    std::vector<std::vector<int>> trueCombinations;
+    
+    for (const auto& combination : allCombinations) {
+        bool result = evaluatePostfix(postfixTokens, combination);
+        if (result) {
+            // Converter a combinação para o formato esperado pelo WiSARD
+            // Ordenar as variáveis pela ordem dos índices
+            std::vector<std::pair<std::string, int>> sortedVars;
+            for (const auto& var : variables) {
+                sortedVars.push_back({var, variableIndexes.at(var)});
+            }
+            std::sort(sortedVars.begin(), sortedVars.end(), 
+                [](const std::pair<std::string, int>& a, const std::pair<std::string, int>& b) {
+                    return a.second < b.second;
+                });
+            
+            std::vector<int> ruleValues;
+            for (const auto& varPair : sortedVars) {
+                ruleValues.push_back(combination.at(varPair.first) ? 1 : 0);
+            }
+            trueCombinations.push_back(ruleValues);
+        }
+    }
+
+    return trueCombinations;
+}
+
 class Wisard{
 public:
   Wisard(int addressSize): Wisard(addressSize, {}){}
@@ -82,6 +311,15 @@ public:
     }
   }
 
+  void trainWithRules(const DataSet& dataset) {
+    int numberOfRAMS = calculateNumberOfRams(dataset[0].size(), addressSize, completeAddressing);
+    checkConfidence(numberOfRAMS);
+    for(size_t i=0; i<dataset.size(); i++){
+      if(verbose) std::cout << "\rtraining with rules " << i+1 << " of " << dataset.size();
+      trainWithRules<BinInput>(dataset[i], dataset.getLabel(i));
+    }
+  }
+
   void train(const std::vector<std::vector<int>>& images, const std::vector<std::string>& labels){
     int numberOfRAMS = calculateNumberOfRams(images[0].size(), addressSize, completeAddressing);
     checkConfidence(numberOfRAMS);
@@ -89,6 +327,17 @@ public:
     for(unsigned int i=0; i<images.size(); i++){
       if(verbose) std::cout << "\rtraining " << i+1 << " of " << images.size();
       train<std::vector<int>>(images[i], labels[i]);
+    }
+    if(verbose) std::cout << "\r" << std::endl;
+  }
+
+  void trainWithRules(const std::vector<std::vector<int>>& images, const std::vector<std::string>& labels){
+    int numberOfRAMS = calculateNumberOfRams(images[0].size(), addressSize, completeAddressing);
+    checkConfidence(numberOfRAMS);
+    checkInputSizes(images.size(), labels.size());
+    for(unsigned int i=0; i<images.size(); i++){
+      if(verbose) std::cout << "\rtraining with rules " << i+1 << " of " << images.size();
+      trainWithRules<std::vector<int>>(images[i], labels[i]);
     }
     if(verbose) std::cout << "\r" << std::endl;
   }
@@ -163,23 +412,34 @@ public:
   }
 
 
-  void addRule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<int>& ruleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
-    if(discriminators.find(label) == discriminators.end()){
-      int inferredEntrySize = 0;
-      if(variableIndexes.size() > 0){
-        inferredEntrySize = *std::max_element(variableIndexes.begin(), variableIndexes.end()) + 1;
-      }
-      // Garantir que entrySize seja pelo menos addressSize
-      if(inferredEntrySize < addressSize){
-        inferredEntrySize = addressSize;
-      }
-      discriminators[label] = Discriminator(inferredEntrySize);
-    }
-    discriminators[label].addRuleRAM(variableIndexes, ruleValues, alpha, basein, ignoreZeroIn);
-  }
+  // void addRule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<int>& ruleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
+  //   if(discriminators.find(label) == discriminators.end()){
+  //     int inferredEntrySize = 0;
+  //     if(variableIndexes.size() > 0){
+  //       inferredEntrySize = *std::max_element(variableIndexes.begin(), variableIndexes.end()) + 1;
+  //     }
+  //     // Garantir que entrySize seja pelo menos addressSize
+  //     if(inferredEntrySize < addressSize){
+  //       inferredEntrySize = addressSize;
+  //     }
+      
+  //     // Calcular o entrySize necessário para garantir pelo menos 2 RAMs normais
+  //     // Como no treinamento normal: numberOfRAMS = ceil(entrySize / addressSize)
+  //     // Para ter pelo menos 2 RAMs: entrySize >= addressSize * 2 + 1 (com completeAddressing=true)
+  //     int minEntrySizeForTwoRAMs = addressSize * 2 + 1;
+  //     if(inferredEntrySize < minEntrySizeForTwoRAMs){
+  //       inferredEntrySize = minEntrySizeForTwoRAMs;
+  //     }
+      
+  //     // Criar discriminador com RAMs normais (mapeamento aleatório) E regras
+  //     makeDiscriminator(label, inferredEntrySize);
+  //   }
+  //   discriminators[label].addRuleRAM(variableIndexes, ruleValues, alpha, basein, ignoreZeroIn);
+  // }
 
   void addRule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<std::vector<int>>& multipleRuleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
     if(discriminators.find(label) == discriminators.end()){
+      // Criar discriminador considerando mapeamento existente se disponível
       int inferredEntrySize = 0;
       if(variableIndexes.size() > 0){
         inferredEntrySize = *std::max_element(variableIndexes.begin(), variableIndexes.end()) + 1;
@@ -188,9 +448,46 @@ public:
       if(inferredEntrySize < addressSize){
         inferredEntrySize = addressSize;
       }
-      discriminators[label] = Discriminator(inferredEntrySize);
+      
+      // Verificar se existe mapeamento para esta classe
+      auto it = mapping.find(label);
+      if (it != mapping.end())
+      {
+        // Usar mapeamento existente
+        discriminators[label] = Discriminator(it->second, inferredEntrySize, ignoreZero, base);
+      }
+      else
+      {
+        // Criar discriminador vazio apenas para regras
+        // O entrySize será expandido quando trainWithRules() for chamado
+        discriminators[label] = Discriminator(inferredEntrySize);
+      }
     }
     discriminators[label].addRuleRAM(variableIndexes, multipleRuleValues, alpha, basein, ignoreZeroIn);
+  }
+
+  void addRule(const std::string& label, const std::map<std::string, int>& variableIndexes, const std::string& rule, int alpha, int basein = 2, bool ignoreZeroIn = false){
+    // Converter map para vector de índices ordenados
+    std::vector<std::pair<std::string, int>> sortedVars;
+    for (const auto& pair : variableIndexes) {
+      sortedVars.push_back(pair);
+    }
+    std::sort(sortedVars.begin(), sortedVars.end(), 
+        [](const std::pair<std::string, int>& a, const std::pair<std::string, int>& b) {
+            return a.second < b.second;
+        });
+    
+    std::vector<int> indexes;
+    for (const auto& pair : sortedVars) {
+      indexes.push_back(pair.second);
+    }
+    
+    // Compilar a regra booleana
+    RuleCompiler compiler;
+    std::vector<std::vector<int>> ruleValues = compiler.compileRule(rule, variableIndexes);
+    
+    // Usar a função existente com os valores compilados
+    addRule(label, indexes, ruleValues, alpha, basein, ignoreZeroIn);
   }
 
 
@@ -200,6 +497,40 @@ protected:
     if(discriminators.find(label) == discriminators.end()){
       makeDiscriminator(label, image.size());
     }
+    else {
+      // Se o discriminador já existe (pode ter regras), adicionar RAMs normais se necessário
+      // Verificar se este discriminador foi criado com mapeamento
+      bool hasMapping = mapping.find(label) != mapping.end();
+      discriminators[label].ensureNormalRAMs(addressSize, image.size(), ignoreZero, completeAddressing, base, !hasMapping);
+    }
+    discriminators[label].train(image);
+  }
+
+  template<typename T>
+  void trainWithRules(const T& image, const std::string& label){
+    if(discriminators.find(label) == discriminators.end()){
+      // Seguir a mesma lógica da função train: criar discriminador com tamanho da imagem
+      makeDiscriminator(label, image.size());
+    }
+    else {
+      // Se o discriminador já existe (pode ter regras), expandir entrySize se necessário
+      if(discriminators[label].getEntrySize() < image.size()){
+        discriminators[label].expandEntrySize(image.size());
+      }
+      // Adicionar RAMs normais se necessário
+      // Verificar se este discriminador foi criado com mapeamento
+      bool hasMapping = mapping.find(label) != mapping.end();
+      if(!hasMapping){
+        // Se não há mapeamento, sempre criar RAMs normais
+        discriminators[label].ensureNormalRAMs(addressSize, image.size(), ignoreZero, completeAddressing, base, true);
+      }
+      else {
+        // Se há mapeamento, não criar RAMs normais (elas já existem)
+        discriminators[label].ensureNormalRAMs(addressSize, image.size(), ignoreZero, completeAddressing, base, false);
+      }
+    }
+    // Sempre treinar no discriminador existente (que pode já ter regras)
+    // As RAMs criadas por regras também passarão pelo treinamento normal
     discriminators[label].train(image);
   }
 
@@ -307,12 +638,9 @@ protected:
     {
       discriminators[label] = Discriminator(it->second, entrySize, ignoreZero, base);
     }
-    else if (indexes.size() != 0)
-    {
-      discriminators[label] = Discriminator(indexes, addressSize, entrySize, ignoreZero, base);
-    }
     else
     {
+      // Sempre usar setRAMShuffle com completeAddressing para garantir mapeamento correto
       discriminators[label] = Discriminator(addressSize, entrySize, ignoreZero, completeAddressing, base);
     }
   }

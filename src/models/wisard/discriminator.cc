@@ -91,6 +91,20 @@ public:
     }
   }
 
+  void trainWithRules(const std::vector<int>& image){
+    trainWithRules<std::vector<int>>(image);
+  }
+
+  void trainWithRules(const BinInput& image) {
+    trainWithRules<BinInput>(image);
+  }
+
+  void trainWithRules(const std::vector<std::vector<int>>& image){
+    for(unsigned int i=0; i<image.size(); i++){
+      trainWithRules(image[i]);
+    }
+  }
+
   void untrain(const std::vector<int>& image){
       checkEntrySize(image.size());
       count--;
@@ -105,6 +119,16 @@ public:
 
   int getNumberOfRAMS() const{
     return rams.size();
+  }
+
+  int getEntrySize() const{
+    return entrySize;
+  }
+
+  void expandEntrySize(int newEntrySize){
+    if(newEntrySize > entrySize){
+      entrySize = newEntrySize;
+    }
   }
 
   std::vector<int> getMentalImage()
@@ -251,6 +275,68 @@ public:
       r.setCountAtAddress(index, (content_t)alpha);
     }
     rams.push_back(r);
+  }
+
+  void ensureNormalRAMs(int addressSize, int imageSize, bool ignoreZero, bool completeAddressing, int base, bool useRandomMapping = true){
+    // Atualizar entrySize para o tamanho da imagem
+    entrySize = imageSize;
+    
+    if(useRandomMapping){
+      // Verificar se já existem RAMs normais (não apenas regras)
+      // Se não existirem, criar RAMs normais baseadas no tamanho da imagem
+      if(true){ // Sempre criar RAMs normais quando useRandomMapping é true
+        // Verificar se já existem RAMs normais para evitar duplicação
+        bool hasNormal = false;
+        for(unsigned int i=0; i<rams.size(); i++){
+          if(rams[i].getAddresses().size() == addressSize){
+            hasNormal = true;
+            break;
+          }
+        }
+        
+        if(!hasNormal){
+        // Criar RAMs normais manualmente para evitar problemas de verificação
+        int numberOfRAMS = imageSize / addressSize;
+        int remain = imageSize % addressSize;
+        int indexesSize = imageSize;
+        if(completeAddressing && remain > 0) {
+          numberOfRAMS++;
+          indexesSize += addressSize-remain;
+        }
+
+        // Criar índices para as RAMs normais
+        std::vector<int> indexes(indexesSize);
+        for(int i=0; i<imageSize; i++) {
+          indexes[i]=i;
+        }
+        for(unsigned int i=imageSize; i<indexes.size(); i++){
+          indexes[i] = randint(0, imageSize-1, false);
+        }
+        random_shuffle(indexes.begin(), indexes.end());
+
+        // Criar RAMs normais
+        for(int i=0; i<numberOfRAMS; i++){
+          std::vector<int> subIndexes(indexes.begin() + (i*addressSize), indexes.begin() + ((i+1)*addressSize));
+          rams.push_back(RAM(subIndexes, ignoreZero, base));
+        }
+        }
+      }
+    }
+    // Se useRandomMapping = false, não criar RAMs normais aqui
+    // Elas já foram criadas pelo mapeamento existente
+  }
+
+  bool hasNormalRAMs(int addressSize){
+    // Verificar se existem RAMs normais
+    // RAMs normais têm tamanho igual ao addressSize
+    // RAMs de regras têm tamanho diferente (baseado nas variáveis da regra)
+    for(unsigned int i=0; i<rams.size(); i++){
+      // RAMs normais têm tamanho igual ao addressSize
+      if(rams[i].getAddresses().size() == addressSize){
+        return true;
+      }
+    }
+    return false;
   }
 
 protected:
@@ -411,7 +497,22 @@ protected:
 
   template<typename T>
   void train(const T& image) {
-    checkEntrySize(image.size());
+    // Verificar se o tamanho da imagem é compatível com as RAMs existentes
+    // Permitir imagens menores que entrySize (para RAMs de regras)
+    if(image.size() > entrySize){
+      throw Exception("The image size is greater than discriminator entry size!");
+    }
+    count++;
+    for(unsigned int i=0; i<rams.size(); i++){
+      rams[i].train(image);
+    }
+  }
+
+  template<typename T>
+  void trainWithRules(const T& image) {
+    // Seguir a mesma lógica da função train normal
+    // As RAMs criadas por regras também passarão pelo treinamento normal
+    // Não verificar entrySize para permitir RAMs de tamanhos variados (incluindo regras)
     count++;
     for(unsigned int i=0; i<rams.size(); i++){
       rams[i].train(image);

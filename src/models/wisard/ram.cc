@@ -44,6 +44,14 @@ public:
     train<BinInput>(image);
   }
 
+  void trainWithRules(const std::vector<int>& image){
+    trainWithRules<std::vector<int>>(image);
+  }
+
+  void trainWithRules(const BinInput& image){
+    trainWithRules<BinInput>(image);
+  }
+
   void untrain(const std::vector<int>& image){
       addr_t index = getIndex(image);
       auto it = positions.find(index);
@@ -130,6 +138,10 @@ public:
     return info;
   }
 
+  const std::vector<int>& getAddresses() const {
+    return addresses;
+  }
+
   ~RAM(){
     addresses.clear();
     positions.clear();
@@ -141,6 +153,10 @@ protected:
     addr_t index = 0;
     addr_t p = 1;
     for(unsigned int i=0; i<addresses.size(); i++){
+      // Verificar se o endereço está dentro dos limites da imagem
+      if(addresses[i] >= image.size()){
+        throw Exception("RAM address index is out of bounds for the given image size!");
+      }
       int bin = image[addresses[i]];
       checkPos(bin);
       index += bin*p;
@@ -151,6 +167,23 @@ protected:
 
   template<typename T>
   void train(const T& image){
+    addr_t index = getIndex<T>(image);
+    auto it = positions.find(index);
+    if(it == positions.end()){
+      positions.insert(it,std::pair<addr_t,content_t>(index, 1));
+    }
+    else{
+      it->second++;
+    }
+  }
+
+  template<typename T>
+  void trainWithRules(const T& image){
+    // Verifica se a imagem tem tamanho suficiente para os endereços da RAM
+    if(image.size() <= *std::max_element(addresses.begin(), addresses.end())){
+      return; // Não treina se a imagem for muito pequena
+    }
+    
     addr_t index = getIndex<T>(image);
     auto it = positions.find(index);
     if(it == positions.end()){
