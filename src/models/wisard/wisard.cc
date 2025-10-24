@@ -411,32 +411,6 @@ public:
     return json(false,"");
   }
 
-
-  // void addRule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<int>& ruleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
-  //   if(discriminators.find(label) == discriminators.end()){
-  //     int inferredEntrySize = 0;
-  //     if(variableIndexes.size() > 0){
-  //       inferredEntrySize = *std::max_element(variableIndexes.begin(), variableIndexes.end()) + 1;
-  //     }
-  //     // Garantir que entrySize seja pelo menos addressSize
-  //     if(inferredEntrySize < addressSize){
-  //       inferredEntrySize = addressSize;
-  //     }
-      
-  //     // Calcular o entrySize necessário para garantir pelo menos 2 RAMs normais
-  //     // Como no treinamento normal: numberOfRAMS = ceil(entrySize / addressSize)
-  //     // Para ter pelo menos 2 RAMs: entrySize >= addressSize * 2 + 1 (com completeAddressing=true)
-  //     int minEntrySizeForTwoRAMs = addressSize * 2 + 1;
-  //     if(inferredEntrySize < minEntrySizeForTwoRAMs){
-  //       inferredEntrySize = minEntrySizeForTwoRAMs;
-  //     }
-      
-  //     // Criar discriminador com RAMs normais (mapeamento aleatório) E regras
-  //     makeDiscriminator(label, inferredEntrySize);
-  //   }
-  //   discriminators[label].addRuleRAM(variableIndexes, ruleValues, alpha, basein, ignoreZeroIn);
-  // }
-
   void addRule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<std::vector<int>>& multipleRuleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
     if(discriminators.find(label) == discriminators.end()){
       // Criar discriminador considerando mapeamento existente se disponível
@@ -449,8 +423,23 @@ public:
         inferredEntrySize = addressSize;
       }
       
-      // Verificar se existe mapeamento para esta classe
+      // Se há mapeamento, usar o tamanho real dos dados baseado no mapeamento
       auto it = mapping.find(label);
+      if (it != mapping.end()) {
+        // Calcular o tamanho real baseado no mapeamento
+        int maxIndexInMapping = 0;
+        for (const auto& tuple : it->second) {
+          for (int index : tuple) {
+            if (index > maxIndexInMapping) {
+              maxIndexInMapping = index;
+            }
+          }
+        }
+        // O entrySize deve ser pelo menos maxIndexInMapping + 1
+        inferredEntrySize = maxIndexInMapping + 1;
+      }
+      
+      // Verificar se existe mapeamento para esta classe
       if (it != mapping.end())
       {
         // Usar mapeamento existente
@@ -529,9 +518,8 @@ protected:
         discriminators[label].ensureNormalRAMs(addressSize, image.size(), ignoreZero, completeAddressing, base, false);
       }
     }
-    // Sempre treinar no discriminador existente (que pode já ter regras)
-    // As RAMs criadas por regras também passarão pelo treinamento normal
-    discriminators[label].train(image);
+
+    discriminators[label].trainWithRules(image);
   }
 
   template<typename T>
@@ -555,6 +543,26 @@ protected:
     for(unsigned int i=0; i<images.size(); i++){
       if(verbose) std::cout << "\rclassifying with rules " << i+1 << " of " << images.size();
       std::map<std::string,int> candidates = classify_with_rules_single(images[i], searchBestConfidence);
+      
+      if(verbose) {
+        std::cout << "\n=== DEBUG: Classificação da imagem " << i+1 << " ===" << std::endl;
+        std::cout << "Imagem: [";
+        for(size_t j=0; j<images[i].size(); j++){
+          std::cout << images[i][j];
+          if(j < images[i].size()-1) std::cout << ", ";
+        }
+        std::cout << "]" << std::endl;
+        
+        // Mostrar votações de cada discriminador
+        for(auto& candidate : candidates){
+          std::cout << "Discriminador '" << candidate.first << "': " << candidate.second << " votos" << std::endl;
+        }
+        
+        std::string winner = Bleaching::getBiggestCandidate(candidates);
+        std::cout << "Classe vencedora: " << winner << std::endl;
+        std::cout << "=================================" << std::endl;
+      }
+      
       labels[i] = Bleaching::getBiggestCandidate(candidates);
     }
     if(verbose) std::cout << "\r" << std::endl;
@@ -593,6 +601,17 @@ protected:
 
     for(std::map<std::string,Discriminator>::iterator i=discriminators.begin(); i!=discriminators.end(); ++i){
       allvotes[i->first] = i->second.classify_with_rules(image);
+      
+      if(verbose) {
+        std::cout << "  Discriminador '" << i->first << "':" << std::endl;
+        std::vector<int> votes = allvotes[i->first];
+        int total_votes = 0;
+        for(size_t j=0; j<votes.size(); j++){
+          std::cout << "    RAM " << j << ": " << votes[j] << " votos" << std::endl;
+          total_votes += votes[j];
+        }
+        std::cout << "    Total: " << total_votes << " votos" << std::endl;
+      }
     }
     return Bleaching::make(allvotes, bleachingActivated, searchBestConfidence, confidence);
   }

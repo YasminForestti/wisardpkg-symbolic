@@ -1,8 +1,8 @@
 
 class RAM{
 public:
-  RAM(){}
-  RAM(nl::json c){
+  RAM(): isRuleRAM(false){}
+  RAM(nl::json c): isRuleRAM(false){
     ignoreZero = c["ignoreZero"];
     base=c["base"];
     addresses = c["addresses"].get<std::vector<int>>();
@@ -11,12 +11,12 @@ public:
     RAMDataHandle handle(c["data"].get<std::string>());
     positions = handle.get(0);
   }
-  RAM(const int addressSize, const int entrySize, const bool ignoreZero=false, int base=2): ignoreZero(ignoreZero), base(base){
+  RAM(const int addressSize, const int entrySize, const bool ignoreZero=false, int base=2): ignoreZero(ignoreZero), base(base), isRuleRAM(false){
     checkLimitAddressSize(addressSize, base);
     addresses = std::vector<int>(addressSize);
     generateRandomAddresses(entrySize);
   }
-  RAM(const std::vector<int> indexes, const bool ignoreZero=false, int base=2): addresses(indexes), ignoreZero(ignoreZero), base(base){
+  RAM(const std::vector<int> indexes, const bool ignoreZero=false, int base=2): addresses(indexes), ignoreZero(ignoreZero), base(base), isRuleRAM(false){
     checkLimitAddressSize(indexes.size(), base);
   }
 
@@ -120,6 +120,14 @@ public:
   void setCountAtAddress(addr_t index, content_t value){
     positions[index] = value;
   }
+  
+  void setAsRuleRAM(){
+    isRuleRAM = true;
+  }
+  
+  bool getIsRuleRAM() const {
+    return isRuleRAM;
+  }
 
   std::string getRAMInfo(){
     std::string info = "RAM addresses: [";
@@ -185,6 +193,22 @@ protected:
     }
     
     addr_t index = getIndex<T>(image);
+    
+    if(isRuleRAM){
+      // Para RAMs de regras: verifica se a regra foi satisfeita
+      // A regra é satisfeita se o endereço calculado corresponde a uma das combinações
+      // que tornam a regra verdadeira (já preenchidas durante addRuleRAM)
+      auto it = positions.find(index);
+      if(it != positions.end()){
+        // Se a posição existe no mapa, significa que foi preenchida pela regra
+        // Incrementa o contador apenas se a posição já existe
+        it->second++;
+      }
+      // Se a posição não está preenchida, não treina (não satisfaz a regra)
+      return;
+    }
+    
+    // Para RAMs normais, treina normalmente
     auto it = positions.find(index);
     if(it == positions.end()){
       positions.insert(it,std::pair<addr_t,content_t>(index, 1));
@@ -233,6 +257,7 @@ private:
   ram_t positions;
   bool ignoreZero;
   int base;
+  bool isRuleRAM;
 
   const std::vector<int> convertToBase(const int number) const{
     std::vector<int> numberConverted(addresses.size());

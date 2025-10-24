@@ -79,11 +79,10 @@ PYBIND11_MODULE(wisardpkg, m){
       .def("classify", (py::list (WisardWrapper::*)(const DataSet&)) &WisardWrapper::pyClassify)
       .def("classifyWithRules", (py::list (WisardWrapper::*)(const std::vector<std::vector<int>>&)) &WisardWrapper::pyClassifyWithRules)
       .def("classifyWithRules", (py::list (WisardWrapper::*)(const DataSet&)) &WisardWrapper::pyClassifyWithRules)
-      // .def("add_rule", (void (WisardWrapper::*)(const std::string&, const std::vector<int>&, const std::vector<int>&, int, int, bool)) &WisardWrapper::add_rule, py::arg("label"), py::arg("variableIndexes"), py::arg("ruleValues"), py::arg("alpha"), py::arg("base")=2, py::arg("ignoreZero")=false)
-      // .def("add_rule", (void (WisardWrapper::*)(const std::string&, const std::vector<int>&, const std::vector<std::vector<int>>&, int, int, bool)) &WisardWrapper::add_rule, py::arg("label"), py::arg("variableIndexes"), py::arg("multipleRuleValues"), py::arg("alpha"), py::arg("base")=2, py::arg("ignoreZero")=false)
       .def("addRule", (void (WisardWrapper::*)(const std::string&, const std::map<std::string, int>&, const std::string&, int, int, bool)) &WisardWrapper::add_rule, py::arg("label"), py::arg("variableIndexes"), py::arg("rule"), py::arg("alpha"), py::arg("base")=2, py::arg("ignoreZero")=false)
       .def("getMentalImages", &WisardWrapper::getMentalImages)
       .def("getRamsInfo", &WisardWrapper::get_rams_info)
+      .def("debugClassification", &WisardWrapper::debug_classification)
       .def("leaveOneOut", (void (WisardWrapper::*)(const std::vector<int>&, const std::string&)) &WisardWrapper::leaveOneOut)
       .def("leaveMoreOut", (void (WisardWrapper::*)(const std::vector<std::vector<int>>&, const std::vector<std::string>&)) &WisardWrapper::leaveMoreOut)
       .def("jsonConfig", &WisardWrapper::jsonConfig)
@@ -107,7 +106,7 @@ PYBIND11_MODULE(wisardpkg, m){
       .def("json", (std::string (ClusWisardWrapper::*)()) &ClusWisardWrapper::json)
       .def("json", (std::string (ClusWisardWrapper::*)(bool)) &ClusWisardWrapper::json)
       .def("json", (std::string (ClusWisardWrapper::*)(bool,std::string)) &ClusWisardWrapper::json)
-      // .def("getsizeof", &ClusWisardWrapper::getsizeof)
+      .def("getsizeof", &ClusWisardWrapper::getsizeof)
     ;
 
-}
+  }

@@ -1,6 +1,16 @@
 inline int randint(int min, int max, bool isSeed=true){
-  if(isSeed)
-    std::srand(time(NULL));
+  if(isSeed) {
+    // Usar microssegundos para máxima precisão e reduzir colisões
+    auto now = std::chrono::high_resolution_clock::now();
+    auto duration = now.time_since_epoch();
+    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+    
+    // Combinar microssegundos com PID do processo para maior unicidade
+    auto pid = static_cast<unsigned int>(getpid());
+    unsigned int seed = static_cast<unsigned int>(microseconds) ^ pid;
+    
+    std::srand(seed);
+  }
   return min + (std::rand() % (int)(max - min + 1));
 }
 

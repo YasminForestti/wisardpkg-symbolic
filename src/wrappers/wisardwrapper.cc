@@ -108,6 +108,27 @@ public:
     return getRAMSInfo();
   }
 
+  void debug_classification(const std::vector<std::vector<int>>& images){
+    std::cout << "\n=== DEBUG DETALHADO DA CLASSIFICAÇÃO ===" << std::endl;
+    for(unsigned int i=0; i<images.size(); i++){
+      std::cout << "\n--- Imagem " << i+1 << " ---" << std::endl;
+      std::cout << "Dados: [";
+      for(size_t j=0; j<images[i].size(); j++){
+        std::cout << images[i][j];
+        if(j < images[i].size()-1) std::cout << ", ";
+      }
+      std::cout << "]" << std::endl;
+      
+      // Classificar e mostrar detalhes
+      std::map<std::string,int> candidates = classify_with_rules_single(images[i], searchBestConfidence);
+      std::cout << "Resultado da classificação:" << std::endl;
+      for(auto& candidate : candidates){
+        std::cout << "  " << candidate.first << ": " << candidate.second << " votos" << std::endl;
+      }
+    }
+    std::cout << "========================================\n" << std::endl;
+  }
+
 protected:
   py::list getClassesDegrees(std::map<std::string, int> candidates) const{
     float total = 0;
@@ -139,17 +160,14 @@ protected:
 
   template<typename T>
   py::list _pyClassifyWithRules(const T& images){
-    // Para classify_with_rules, não calculamos numberOfRAMS fixo pois RAMs podem ter tamanhos variados
-    float numberOfRAMS = 1.0; // Valor padrão
-
-    py::list labels(images.size());
-    for(unsigned int i=0; i<images.size(); i++){
-      if(verbose) std::cout << "\rclassifying with rules " << i+1 << " of " << images.size();
-      std::map<std::string,int> candidates = classify_with_rules_single(images[i], searchBestConfidence);
-      std::string aClass = Bleaching::getBiggestCandidate(candidates);
-      setClassifyOutput(labels, i, aClass, numberOfRAMS, candidates);
+    // Usar a função classify_with_rules da classe Wisard que já tem verbose implementado
+    std::vector<std::string> results = classify_with_rules(images);
+    
+    // Converter para py::list mantendo a compatibilidade com setClassifyOutput
+    py::list labels(results.size());
+    for(unsigned int i=0; i<results.size(); i++){
+      labels[i] = results[i];
     }
-    if(verbose) std::cout << "\r" << std::endl;
     return labels;
   }
 };

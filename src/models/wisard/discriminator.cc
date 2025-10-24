@@ -216,7 +216,8 @@ public:
     for(unsigned int i=0; i<variableIndexes.size(); i++){
       if(variableIndexes[i] > maxIndex) maxIndex = variableIndexes[i];
     }
-    if(entrySize <= maxIndex){
+
+    if(maxIndex >= getEntrySize()){
       throw Exception("Rule uses indexes greater than discriminator entry size!");
     }
 
@@ -233,6 +234,7 @@ public:
       p *= base;
     }
     r.setCountAtAddress(index, (content_t)alpha);
+    r.setAsRuleRAM(); // Marcar como RAM de regra
     rams.push_back(r);
   }
 
@@ -246,9 +248,10 @@ public:
     for(unsigned int i=0; i<variableIndexes.size(); i++){
       if(variableIndexes[i] > maxIndex) maxIndex = variableIndexes[i];
     }
-    if(entrySize <= maxIndex){
-      throw Exception("Rule uses indexes greater than discriminator entry size!");
-    }
+
+     if(maxIndex >= getEntrySize()){
+       throw Exception("Rule uses indexes greater than discriminator entry size!");
+     }
 
     // Create a single RAM for all rule values
     RAM r(variableIndexes, ignoreZero, base);
@@ -274,6 +277,7 @@ public:
       }
       r.setCountAtAddress(index, (content_t)alpha);
     }
+    r.setAsRuleRAM(); // Marcar como RAM de regra
     rams.push_back(r);
   }
 
@@ -288,7 +292,7 @@ public:
         // Verificar se já existem RAMs normais para evitar duplicação
         bool hasNormal = false;
         for(unsigned int i=0; i<rams.size(); i++){
-          if(rams[i].getAddresses().size() == addressSize){
+          if(!rams[i].getIsRuleRAM()){
             hasNormal = true;
             break;
           }
@@ -497,11 +501,12 @@ protected:
 
   template<typename T>
   void train(const T& image) {
-    // Verificar se o tamanho da imagem é compatível com as RAMs existentes
-    // Permitir imagens menores que entrySize (para RAMs de regras)
-    if(image.size() > entrySize){
-      throw Exception("The image size is greater than discriminator entry size!");
-    }
+    // // Verificar se o tamanho da imagem é compatível com as RAMs existentes
+    // // Permitir imagens menores que entrySize (para RAMs de regras)
+    // if(image.size() > entrySize){
+    //   throw Exception("The image size is greater than discriminator entry size!");
+    // }
+    checkEntrySize(image.size());
     count++;
     for(unsigned int i=0; i<rams.size(); i++){
       rams[i].train(image);
@@ -510,12 +515,14 @@ protected:
 
   template<typename T>
   void trainWithRules(const T& image) {
-    // Seguir a mesma lógica da função train normal
-    // As RAMs criadas por regras também passarão pelo treinamento normal
-    // Não verificar entrySize para permitir RAMs de tamanhos variados (incluindo regras)
     count++;
     for(unsigned int i=0; i<rams.size(); i++){
-      rams[i].train(image);
+      // Verificar se é uma RAM de regra antes de treinar
+      if(rams[i].getIsRuleRAM()){
+        rams[i].trainWithRules(image);
+      }else{
+        rams[i].train(image);
+      }
     }
   }
 
