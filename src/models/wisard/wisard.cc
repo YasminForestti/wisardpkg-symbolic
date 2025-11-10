@@ -598,9 +598,11 @@ protected:
   template<typename T>
   std::map<std::string, int> __classify_with_rules(const T& image, bool searchBestConfidence=false){
     std::map<std::string,std::vector<int>> allvotes;
+    std::map<std::string,std::vector<bool>> ruleRAMs;
 
     for(std::map<std::string,Discriminator>::iterator i=discriminators.begin(); i!=discriminators.end(); ++i){
       allvotes[i->first] = i->second.classify_with_rules(image);
+      ruleRAMs[i->first] = i->second.getRuleRAMsInfo();
       
       if(verbose) {
         std::cout << "  Discriminador '" << i->first << "':" << std::endl;
@@ -613,7 +615,15 @@ protected:
         std::cout << "    Total: " << total_votes << " votos" << std::endl;
       }
     }
-    return Bleaching::make(allvotes, bleachingActivated, searchBestConfidence, confidence);
+    
+    if(searchBestConfidence){
+      // Para searchBestConfidence, usar a função normal por enquanto
+      return Bleaching::make(allvotes, bleachingActivated, searchBestConfidence, confidence);
+    }
+    else{
+      // Usar a nova função que trata RAMs de regra de forma diferente
+      return Bleaching::makeConfidencelessWithRules(allvotes, ruleRAMs, bleachingActivated, confidence);
+    }
   }
 
   nl::json getClassesJSON(bool huge, std::string path){

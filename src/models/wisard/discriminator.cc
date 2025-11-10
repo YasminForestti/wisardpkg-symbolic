@@ -125,6 +125,14 @@ public:
     return entrySize;
   }
 
+  std::vector<bool> getRuleRAMsInfo() const{
+    std::vector<bool> ruleRAMs(rams.size());
+    for(unsigned int i=0; i<rams.size(); i++){
+      ruleRAMs[i] = rams[i].getIsRuleRAM();
+    }
+    return ruleRAMs;
+  }
+
   void expandEntrySize(int newEntrySize){
     if(newEntrySize > entrySize){
       entrySize = newEntrySize;
@@ -501,11 +509,6 @@ protected:
 
   template<typename T>
   void train(const T& image) {
-    // // Verificar se o tamanho da imagem é compatível com as RAMs existentes
-    // // Permitir imagens menores que entrySize (para RAMs de regras)
-    // if(image.size() > entrySize){
-    //   throw Exception("The image size is greater than discriminator entry size!");
-    // }
     checkEntrySize(image.size());
     count++;
     for(unsigned int i=0; i<rams.size(); i++){
