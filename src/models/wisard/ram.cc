@@ -139,9 +139,7 @@ public:
     
     info += "Stored positions:\n";
     for(auto it=positions.begin(); it!=positions.end(); ++it){
-      if(it->second > 0){
         info += "  Address " + std::to_string(it->first) + ": count=" + std::to_string(it->second) + "\n";
-      }
     }
     return info;
   }

@@ -56,9 +56,7 @@ public:
           if(isRuleRAM){
             // RAM de regra: sempre contribui com o voto completo, sem verificar bleaching
             int contribution = i->second[j];
-            if(contribution > 0){
-              labels[i->first] += contribution;
-            }
+            labels[i->first] += contribution;
           } else {
             // RAM normal: verifica bleaching e contribui com 1 se passar
             if(i->second[j] >= bleaching){
