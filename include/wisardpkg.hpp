@@ -18319,6 +18319,23 @@ public:
     return size;
   }
 
+  std::string getRAMInfo(){
+    std::string info = "RAM addresses: [";
+    for(unsigned int i=0; i<addresses.size(); i++){
+      if(i > 0) info += ", ";
+      info += std::to_string(addresses[i]);
+    }
+    info += "]\n";
+    
+    info += "Stored positions:\n";
+    for(auto it=positions.begin(); it!=positions.end(); ++it){
+      if(it->second > 0){
+        info += "  Address " + std::to_string(it->first) + ": count=" + std::to_string(it->second) + "\n";
+      }
+    }
+    return info;
+  }
+
   ~RAM(){
     addresses.clear();
     positions.clear();
@@ -18512,6 +18529,16 @@ public:
       }
     }
     return mentalImage;
+  }
+
+  std::string getRAMSInfo(){
+    std::string info = "Discriminator has " + std::to_string(rams.size()) + " RAMs:\n";
+    for(unsigned int i=0; i<rams.size(); i++){
+      info += "RAM " + std::to_string(i) + ":\n";
+      info += rams[i].getRAMInfo();
+      info += "\n";
+    }
+    return info;
   }
 
   std::string jsonConfig(){
@@ -18896,6 +18923,17 @@ public:
       images[d->first] = d->second.getMentalImage();
     }
     return images;
+  }
+
+  std::string getRAMSInfo(){
+    std::string info = "WiSARD RAMs Information:\n";
+    info += "========================\n";
+    for(std::map<std::string, Discriminator>::iterator d=discriminators.begin(); d!=discriminators.end(); ++d){
+      info += "Class: " + d->first + "\n";
+      info += d->second.getRAMSInfo();
+      info += "========================\n";
+    }
+    return info;
   }
 
   std::string jsonConfig(){

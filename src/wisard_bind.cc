@@ -73,9 +73,16 @@ PYBIND11_MODULE(wisardpkg, m){
       .def(py::init<int,py::kwargs>())
       .def("train", (void (WisardWrapper::*)(const std::vector<std::vector<int>>&, const std::vector<std::string>&)) &WisardWrapper::train)
       .def("train", (void (WisardWrapper::*)(const DataSet&)) &WisardWrapper::train)
+      .def("trainWithRules", (void (WisardWrapper::*)(const std::vector<std::vector<int>>&, const std::vector<std::string>&)) &WisardWrapper::pyTrainWithRules)
+      .def("trainWithRules", (void (WisardWrapper::*)(const DataSet&)) &WisardWrapper::pyTrainWithRules)
       .def("classify", (py::list (WisardWrapper::*)(const std::vector<std::vector<int>>&)) &WisardWrapper::pyClassify)
       .def("classify", (py::list (WisardWrapper::*)(const DataSet&)) &WisardWrapper::pyClassify)
+      .def("classifyWithRules", (py::list (WisardWrapper::*)(const std::vector<std::vector<int>>&)) &WisardWrapper::pyClassifyWithRules)
+      .def("classifyWithRules", (py::list (WisardWrapper::*)(const DataSet&)) &WisardWrapper::pyClassifyWithRules)
+      .def("addRule", (void (WisardWrapper::*)(const std::string&, const std::map<std::string, int>&, const std::string&, int, int, bool)) &WisardWrapper::add_rule, py::arg("label"), py::arg("variableIndexes"), py::arg("rule"), py::arg("alpha"), py::arg("base")=2, py::arg("ignoreZero")=false)
       .def("getMentalImages", &WisardWrapper::getMentalImages)
+      .def("getRamsInfo", &WisardWrapper::get_rams_info)
+      .def("debugClassification", &WisardWrapper::debug_classification)
       .def("leaveOneOut", (void (WisardWrapper::*)(const std::vector<int>&, const std::string&)) &WisardWrapper::leaveOneOut)
       .def("leaveMoreOut", (void (WisardWrapper::*)(const std::vector<std::vector<int>>&, const std::vector<std::string>&)) &WisardWrapper::leaveMoreOut)
       .def("jsonConfig", &WisardWrapper::jsonConfig)
@@ -102,4 +109,4 @@ PYBIND11_MODULE(wisardpkg, m){
       .def("getsizeof", &ClusWisardWrapper::getsizeof)
     ;
 
-}
+  }

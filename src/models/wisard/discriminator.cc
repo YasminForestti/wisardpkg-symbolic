@@ -69,6 +69,14 @@ public:
     return _classify<BinInput>(image);
   }
 
+  std::vector<int> classify_with_rules(const std::vector<int>& image) {
+    return _classify_with_rules<std::vector<int>>(image);
+  }
+
+  std::vector<int> classify_with_rules(const BinInput& image) {
+    return _classify_with_rules<BinInput>(image);
+  }
+
   void train(const std::vector<int>& image){
     train<std::vector<int>>(image);
   }
@@ -80,6 +88,20 @@ public:
   void train(const std::vector<std::vector<int>>& image){
     for(unsigned int i=0; i<image.size(); i++){
       train(image[i]);
+    }
+  }
+
+  void trainWithRules(const std::vector<int>& image){
+    trainWithRules<std::vector<int>>(image);
+  }
+
+  void trainWithRules(const BinInput& image) {
+    trainWithRules<BinInput>(image);
+  }
+
+  void trainWithRules(const std::vector<std::vector<int>>& image){
+    for(unsigned int i=0; i<image.size(); i++){
+      trainWithRules(image[i]);
     }
   }
 
@@ -97,6 +119,24 @@ public:
 
   int getNumberOfRAMS() const{
     return rams.size();
+  }
+
+  int getEntrySize() const{
+    return entrySize;
+  }
+
+  std::vector<bool> getRuleRAMsInfo() const{
+    std::vector<bool> ruleRAMs(rams.size());
+    for(unsigned int i=0; i<rams.size(); i++){
+      ruleRAMs[i] = rams[i].getIsRuleRAM();
+    }
+    return ruleRAMs;
+  }
+
+  void expandEntrySize(int newEntrySize){
+    if(newEntrySize > entrySize){
+      entrySize = newEntrySize;
+    }
   }
 
   std::vector<int> getMentalImage()
@@ -160,8 +200,155 @@ public:
     return size;
   }
 
+  std::string getRAMSInfo(){
+    std::string info = "Discriminator has " + std::to_string(rams.size()) + " RAMs:\n";
+    for(unsigned int i=0; i<rams.size(); i++){
+      info += "RAM " + std::to_string(i) + ":\n";
+      info += rams[i].getRAMInfo();
+      info += "\n";
+    }
+    return info;
+  }
+
   ~Discriminator(){
     rams.clear();
+  }
+
+  void addRuleRAM(const std::vector<int>& variableIndexes, const std::vector<int>& ruleValues, int alpha, int base = 2, bool ignoreZero = false){
+    if(variableIndexes.size() != ruleValues.size()){
+      throw Exception("The size of variableIndexes and ruleValues must match!");
+    }
+    checkBase(base);
+    // Ensure entry size supports these indexes
+    int maxIndex = -1;
+    for(unsigned int i=0; i<variableIndexes.size(); i++){
+      if(variableIndexes[i] > maxIndex) maxIndex = variableIndexes[i];
+    }
+
+    if(maxIndex >= getEntrySize()){
+      throw Exception("Rule uses indexes greater than discriminator entry size!");
+    }
+
+    RAM r(variableIndexes, ignoreZero, base);
+    // Compute index from ruleValues in the provided order (base-encoded)
+    addr_t index = 0;
+    addr_t p = 1;
+    for(unsigned int i=0; i<ruleValues.size(); i++){
+      int v = ruleValues[i];
+      if(v < 0 || v >= base){
+        throw Exception("Rule value is out of range for the selected base!");
+      }
+      index += (addr_t)v * p;
+      p *= base;
+    }
+    r.setCountAtAddress(index, (content_t)alpha);
+    r.setAsRuleRAM(); // Marcar como RAM de regra
+    rams.push_back(r);
+  }
+
+  void addRuleRAM(const std::vector<int>& variableIndexes, const std::vector<std::vector<int>>& multipleRuleValues, int alpha, int base = 2, bool ignoreZero = false){
+    if(multipleRuleValues.empty()){
+      throw Exception("multipleRuleValues cannot be empty!");
+    }
+    checkBase(base);
+    // Ensure entry size supports these indexes
+    int maxIndex = -1;
+    for(unsigned int i=0; i<variableIndexes.size(); i++){
+      if(variableIndexes[i] > maxIndex) maxIndex = variableIndexes[i];
+    }
+
+     if(maxIndex >= getEntrySize()){
+       throw Exception("Rule uses indexes greater than discriminator entry size!");
+     }
+
+    // Create a single RAM for all rule values
+    RAM r(variableIndexes, ignoreZero, base);
+    
+    // Process each rule value set
+    for(unsigned int ruleIdx = 0; ruleIdx < multipleRuleValues.size(); ruleIdx++){
+      const std::vector<int>& ruleValues = multipleRuleValues[ruleIdx];
+      
+      if(variableIndexes.size() != ruleValues.size()){
+        throw Exception("The size of variableIndexes and ruleValues must match for each rule!");
+      }
+      
+      // Compute index from ruleValues in the provided order (base-encoded)
+      addr_t index = 0;
+      addr_t p = 1;
+      for(unsigned int i=0; i<ruleValues.size(); i++){
+        int v = ruleValues[i];
+        if(v < 0 || v >= base){
+          throw Exception("Rule value is out of range for the selected base!");
+        }
+        index += (addr_t)v * p;
+        p *= base;
+      }
+      r.setCountAtAddress(index, (content_t)alpha);
+    }
+    r.setAsRuleRAM(); // Marcar como RAM de regra
+    rams.push_back(r);
+  }
+
+  void ensureNormalRAMs(int addressSize, int imageSize, bool ignoreZero, bool completeAddressing, int base, bool useRandomMapping = true){
+    // Atualizar entrySize para o tamanho da imagem
+    entrySize = imageSize;
+    
+    if(useRandomMapping){
+      // Verificar se já existem RAMs normais (não apenas regras)
+      // Se não existirem, criar RAMs normais baseadas no tamanho da imagem
+      if(true){ // Sempre criar RAMs normais quando useRandomMapping é true
+        // Verificar se já existem RAMs normais para evitar duplicação
+        bool hasNormal = false;
+        for(unsigned int i=0; i<rams.size(); i++){
+          if(!rams[i].getIsRuleRAM()){
+            hasNormal = true;
+            break;
+          }
+        }
+        
+        if(!hasNormal){
+        // Criar RAMs normais manualmente para evitar problemas de verificação
+        int numberOfRAMS = imageSize / addressSize;
+        int remain = imageSize % addressSize;
+        int indexesSize = imageSize;
+        if(completeAddressing && remain > 0) {
+          numberOfRAMS++;
+          indexesSize += addressSize-remain;
+        }
+
+        // Criar índices para as RAMs normais
+        std::vector<int> indexes(indexesSize);
+        for(int i=0; i<imageSize; i++) {
+          indexes[i]=i;
+        }
+        for(unsigned int i=imageSize; i<indexes.size(); i++){
+          indexes[i] = randint(0, imageSize-1, false);
+        }
+        random_shuffle(indexes.begin(), indexes.end());
+
+        // Criar RAMs normais
+        for(int i=0; i<numberOfRAMS; i++){
+          std::vector<int> subIndexes(indexes.begin() + (i*addressSize), indexes.begin() + ((i+1)*addressSize));
+          rams.push_back(RAM(subIndexes, ignoreZero, base));
+        }
+        }
+      }
+    }
+    // Se useRandomMapping = false, não criar RAMs normais aqui
+    // Elas já foram criadas pelo mapeamento existente
+  }
+
+  bool hasNormalRAMs(int addressSize){
+    // Verificar se existem RAMs normais
+    // RAMs normais têm tamanho igual ao addressSize
+    // RAMs de regras têm tamanho diferente (baseado nas variáveis da regra)
+    for(unsigned int i=0; i<rams.size(); i++){
+      // RAMs normais têm tamanho igual ao addressSize
+      if(rams[i].getAddresses().size() == addressSize){
+        return true;
+      }
+    }
+    return false;
   }
 
 protected:
@@ -290,6 +477,16 @@ protected:
     return votes;
   }
 
+  template<typename T>
+  std::vector<int> _classify_with_rules(const T& image) {
+    // Não verifica entrySize para permitir RAMs de tamanhos variados
+    std::vector<int> votes(rams.size());
+    for(unsigned int i=0; i<rams.size(); i++){
+      votes[i] = rams[i].getVoteWithRules(image);
+    }
+    return votes;
+  }
+
   void setMapping(std::vector<std::vector<int>>& mapping){
     int size = rams.size();
     for(int i=0; i<size; i++){
@@ -316,6 +513,19 @@ protected:
     count++;
     for(unsigned int i=0; i<rams.size(); i++){
       rams[i].train(image);
+    }
+  }
+
+  template<typename T>
+  void trainWithRules(const T& image) {
+    count++;
+    for(unsigned int i=0; i<rams.size(); i++){
+      // Verificar se é uma RAM de regra antes de treinar
+      if(rams[i].getIsRuleRAM()){
+        rams[i].trainWithRules(image);
+      }else{
+        rams[i].train(image);
+      }
     }
   }
 

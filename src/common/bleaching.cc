@@ -37,6 +37,42 @@ public:
     return labels;
   }
 
+  static std::map<std::string, int> makeConfidencelessWithRules(std::map<std::string,std::vector<int>>& allvotes, const std::map<std::string,std::vector<bool>>& ruleRAMs, const bool bleachingActivated, const int confidence) {
+    std::map<std::string, int> labels;
+    int bleaching = 1;
+    std::tuple<bool,int> ambiguity;
+
+    do{
+      for(std::map<std::string,std::vector<int>>::iterator i=allvotes.begin(); i!=allvotes.end(); ++i){
+        labels[i->first] = 0;
+        // Verificar se há informações sobre RAMs de regra para este discriminador
+        auto ruleRAMsIt = ruleRAMs.find(i->first);
+        bool hasRuleInfo = (ruleRAMsIt != ruleRAMs.end());
+        
+        for(unsigned int j=0; j<i->second.size(); j++){
+          // Verificar se é uma RAM de regra
+          bool isRuleRAM = hasRuleInfo && j < ruleRAMsIt->second.size() && ruleRAMsIt->second[j];
+          
+          if(isRuleRAM){
+            // RAM de regra: sempre contribui com o voto completo, sem verificar bleaching
+            int contribution = i->second[j];
+            labels[i->first] += contribution;
+          } else {
+            // RAM normal: verifica bleaching e contribui com 1 se passar
+            if(i->second[j] >= bleaching){
+              labels[i->first]++;
+            }
+          }
+        }
+      }
+      if(!bleachingActivated) break;
+      bleaching++;
+      ambiguity = isThereAmbiguity(labels, confidence);
+    }while( std::get<0>(ambiguity) && std::get<1>(ambiguity) > 1 );
+
+    return labels;
+  }
+
   static std::string getBiggestCandidate(std::map<std::string,int>& candidates) {
     std::string label = "";
     int biggest = 0;

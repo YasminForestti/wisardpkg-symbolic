@@ -75,6 +75,60 @@ public:
     return _pyClassify<DataSet>(images);
   }
 
+  py::list pyClassifyWithRules(const std::vector<std::vector<int>>& images){
+    return _pyClassifyWithRules<std::vector<std::vector<int>>>(images);
+  }
+
+  py::list pyClassifyWithRules(const DataSet& images){
+    return _pyClassifyWithRules<DataSet>(images);
+  }
+
+  void pyTrainWithRules(const std::vector<std::vector<int>>& images, const std::vector<std::string>& labels){
+    trainWithRules(images, labels);
+  }
+
+  void pyTrainWithRules(const DataSet& dataset){
+    trainWithRules(dataset);
+  }
+
+  // void add_rule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<int>& ruleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
+  //   addRule(label, variableIndexes, ruleValues, alpha, basein, ignoreZeroIn);
+  // }
+
+  // void add_rule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<std::vector<int>>& multipleRuleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
+  //   addRule(label, variableIndexes, multipleRuleValues, alpha, basein, ignoreZeroIn);
+  // }
+
+  // Nova função add_rule que aceita regras booleanas
+  void add_rule(const std::string& label, const std::map<std::string, int>& variableIndexes, const std::string& rule, int alpha, int basein = 2, bool ignoreZeroIn = false){
+    addRule(label, variableIndexes, rule, alpha, basein, ignoreZeroIn);
+  }
+
+  std::string get_rams_info(){
+    return getRAMSInfo();
+  }
+
+  void debug_classification(const std::vector<std::vector<int>>& images){
+    std::cout << "\n=== DEBUG DETALHADO DA CLASSIFICAÇÃO ===" << std::endl;
+    for(unsigned int i=0; i<images.size(); i++){
+      std::cout << "\n--- Imagem " << i+1 << " ---" << std::endl;
+      std::cout << "Dados: [";
+      for(size_t j=0; j<images[i].size(); j++){
+        std::cout << images[i][j];
+        if(j < images[i].size()-1) std::cout << ", ";
+      }
+      std::cout << "]" << std::endl;
+      
+      // Classificar e mostrar detalhes
+      std::map<std::string,int> candidates = classify_with_rules_single(images[i], searchBestConfidence);
+      std::cout << "Resultado da classificação:" << std::endl;
+      for(auto& candidate : candidates){
+        std::cout << "  " << candidate.first << ": " << candidate.second << " votos" << std::endl;
+      }
+    }
+    std::cout << "========================================\n" << std::endl;
+  }
+
 protected:
   py::list getClassesDegrees(std::map<std::string, int> candidates) const{
     float total = 0;
@@ -101,6 +155,19 @@ protected:
       setClassifyOutput(labels, i, aClass, numberOfRAMS, candidates);
     }
     if(verbose) std::cout << "\r" << std::endl;
+    return labels;
+  }
+
+  template<typename T>
+  py::list _pyClassifyWithRules(const T& images){
+    // Usar a função classify_with_rules da classe Wisard que já tem verbose implementado
+    std::vector<std::string> results = classify_with_rules(images);
+    
+    // Converter para py::list mantendo a compatibilidade com setClassifyOutput
+    py::list labels(results.size());
+    for(unsigned int i=0; i<results.size(); i++){
+      labels[i] = results[i];
+    }
     return labels;
   }
 };
