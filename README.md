@@ -4,7 +4,7 @@
 <!-- [![](https://img.shields.io/pypi/v/wisardpkg.svg)](https://pypi.org/project/wisardpkg/) [![](https://travis-ci.org/IAZero/wisardpkg.svg?branch=master)](https://travis-ci.org/IAZero/wisardpkg) -->
 
 ## Description:
-This project is an extension of the wisardpkg library that expands the WiSARD ecosystem by introducing new models and functionalities while preserving the original design principles of simplicity, performance, and ease of use.
+This project is an extension of the [wisardpkg library](https://github.com/IAZero/wisardpkg) that expands the WiSARD ecosystem by introducing new models and functionalities while preserving the original design principles of simplicity, performance, and ease of use.
 
 The library provides machine learning models based on the WiSARD architecture, supporting supervised, unsupervised, and semi-supervised learning paradigms. In addition to the classical WiSARD model, this project introduces neuro-symbolic extensions that enable the direct incorporation of symbolic knowledge into weightless neural networks.
 
@@ -20,7 +20,7 @@ The following WiSARD-based models are made available:
 ## to install:
 python:
 ```
-pip install wisardpkg
+pip install Symbolicwisardpkg
 ```
 Works to python2 and pyhton3.  
 If you are on Linux and not in a virtual environment, you may need to run as superuser.
