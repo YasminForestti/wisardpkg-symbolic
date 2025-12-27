@@ -10,11 +10,11 @@ The library provides machine learning models based on the WiSARD architecture, s
 
 The following WiSARD-based models are made available:
 
-      - WiSARD: the classical weightless neural network model based on RAM memories.
+- WiSARD: the classical weightless neural network model based on RAM memories.
 
-      - SWiSARD: a neuro-symbolic extension of WiSARD that allows the direct insertion of logical rules into discriminators, enabling hybrid learning from rules and examples.
+- SWiSARD: a neuro-symbolic extension of WiSARD that allows the direct insertion of logical rules into discriminators, enabling hybrid learning from rules and examples.
 
-      - ClusWiSARD: a clustering-based WiSARD model for unsupervised learning.
+- ClusWiSARD: a clustering-based WiSARD model for unsupervised learning.
 
 
 ## to install:
