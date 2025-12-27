@@ -28,29 +28,29 @@ If you are on Linux and not in a virtual environment, you may need to run as sup
 #### obs:
 To install on windows platform you can use [anaconda](https://anaconda.org/) and do:
 ```
-python -m pip install wisardpkg
+python -m pip install Symbolicwisardpkg
 ```
 c++:
-copy the file wisardpkg.hpp inside your project 
+copy the file Symbolicwisardpkg.hpp inside your project 
 ```
-include/wisardpkg.hpp
+include/Symbolicwisardpkg.hpp
 ```
 
 ## to uninstall:
 ```
-pip uninstall wisardpkg
+pip uninstall Symbolicwisardpkg
 ```
 
 ## to import:
 python:
 ```python
-import wisardpkg as wp
+import Symbolicwisardpkg as wp
 ```
 c++:
 ```c++
-# include "wisardpkg.hpp"
+# include "Symbolicwisardpkg.hpp"
 
-namespace wp = wisardpkg;
+namespace wp = Symbolicwisardpkg;
 ```
 
 ## to use:
@@ -98,7 +98,73 @@ out = wsd.classify(X)
 for i,d in enumerate(X):
     print(out[i],d)
 ```
-c++:
+
+### SWiSARD
+
+SWiSARD with bleaching by default:
+
+python:
+```python
+# load input data, just zeros and ones  
+X = [
+      [1,1,1,0,0,0,0,0],
+      [1,1,1,1,0,0,0,0],
+      [0,0,0,0,1,1,1,1],
+      [0,0,0,0,0,1,1,1]
+    ]
+
+# load label data, which must be a string array
+y = [
+      "cold",
+      "cold",
+      "hot",
+      "hot"
+    ]
+
+addressSize = 3     # number of addressing bits in the ram
+ignoreZero  = False # optional; causes the rams to ignore the address 0
+verbose = True      # optional; prints the progress of train() and classify()
+
+wsd = wp.Wisard(addressSize, ignoreZero=ignoreZero, verbose=verbose)
+
+# Add symbolic rules to discriminators
+# variableIndexes maps variable names to indices in the input vector
+# Example: if the vector has 8 positions [0,1,2,3,4,5,6,7], we can name:
+# - x0 for index 0, x1 for index 1, etc.
+
+# Add rule for class "cold": (x0 * x1) + (x0 * x2)
+# This means: (position 0 AND position 1) OR (position 0 AND position 2)
+variableIndexes_cold = {
+    "x0": 0,  # first position of the vector
+    "x1": 1,  # second position of the vector
+    "x2": 2   # third position of the vector
+}
+rule_cold = "(x0 * x1) + (x0 * x2)"  # boolean expression: * = AND, + = OR, ! = NOT
+alpha = 10  # rule weight (the higher, the more influence the rule has)
+
+wsd.addRule("cold", variableIndexes_cold, rule_cold, alpha)
+
+# Add rule for class "hot": (x4 * x5) + (x5 * x6)
+variableIndexes_hot = {
+    "x4": 4,
+    "x5": 5,
+    "x6": 6
+}
+rule_hot = "(x4 * x5) + (x5 * x6)"
+wsd.addRule("hot", variableIndexes_hot, rule_hot, alpha)
+
+# Train using trainWithRules (considers rules during training)
+wsd.trainWithRules(X, y)
+
+# Classify using classifyWithRules (considers rules during classification)
+out = wsd.classifyWithRules(X)
+
+# the output of classifyWithRules is a string list in the same sequence as the input
+for i, d in enumerate(X):
+    print(out[i], d)
+```
+
+<!-- c++:
 ```c++
 
 vector<vector<int>> X(4);
@@ -128,7 +194,7 @@ for(int i=0; i<4; i++){
       cout << "i: " << i << "; class: " << out[i] << endl;
 }
 
-```
+``` -->
 ### ClusWiSARD
 
 ClusWiSARD with bleaching by default:
@@ -171,6 +237,6 @@ for i,d in enumerate(X):
 ## Documentation:
 You can find the complete documentation in the [page](https://iazero.github.io/wisardpkg/). -->
 
-## Build on libraries:
+<!-- ## Build on libraries:
 [pybind11](https://github.com/pybind/pybind11)
-[nlohmann/json](https://github.com/nlohmann/json)
+[nlohmann/json](https://github.com/nlohmann/json) -->
