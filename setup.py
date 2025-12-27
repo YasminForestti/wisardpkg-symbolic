@@ -18,7 +18,8 @@ with open("src/version.h") as f:
     __version__ = line.split('"')[1]
     f.close()
 
-__package_name__ = 'wisardpkg'
+__package_name__ = 'Symbolicwisardpkg'
+__module_name__ = 'symbolicwisardpkg'  # Nome do módulo Python (deve corresponder ao PYBIND11_MODULE)
 __src__ = 'src/wisard_bind.cc'
 
 class get_pybind_include(object):
@@ -37,7 +38,7 @@ class get_pybind_include(object):
 
 ext_modules = [
     Extension(
-        __package_name__,
+        __module_name__,
         [__src__],
         include_dirs=[
             # Path to pybind11 headers
@@ -105,18 +106,18 @@ class BuildExt(build_ext):
 setup(
     name=__package_name__,
     version=__version__,
-    author='IAZero',
-    author_email='aluizio@cos.ufrj.br',
-    url='https://github.com/IAZero/wisardpkg',
-    download_url = 'https://github.com/IAZero/wisardpkg/archive/v'+str(__version__)+'.tar.gz',
-    description='A library of wisard with some models based on wisard',
+    author='Yasmin Forestti Romeiro',
+    author_email='y.f.romeiro@gmail.com',
+    url='https://github.com/YasminForestti/wisardpkg-symbolic',
+    # download_url = 'https://github.com/yasminforestti/wisardpkg/archive/v'+str(__version__)+'.tar.gz',
+    description='This project is an extension of the wisardpkg library and provides additional machine learning models based on the WiSARD architecture, including symbolic capabilities. It offers implementations of WiSARD-based models with high performance, easy installation, and a unified usage pattern.',
     long_description=long_description,
     long_description_content_type="text/markdown",
     ext_modules=ext_modules,
     install_requires=['pybind11>=2.2'],
     cmdclass={'build_ext': BuildExt},
     zip_safe=False,
-    keywords = ['wisard', 'weithgless', 'neural', 'net'],
+    keywords = ['wisard', 'weithgless', 'neural', 'net', 'symbolic'],
     classifiers=[
         "License :: OSI Approved :: MIT License"
     ],

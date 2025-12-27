@@ -1,6 +1,6 @@
 #include "wisardpkg.h"
 
-PYBIND11_MODULE(wisardpkg, m){
+PYBIND11_MODULE(symbolicwisardpkg, m){
     m.attr("__version__") = __version__;
 
     //data

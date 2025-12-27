@@ -17,7 +17,7 @@ install:
 	$(PIP) install .
 
 uninstall:
-	$(PIP) uninstall wisardpkg
+	$(PIP) uninstall symbolicwisardpkg
 
 geninclude:
 	python generate_include.py

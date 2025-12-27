@@ -1,10 +1,21 @@
-# wisardpkg [![](https://img.shields.io/pypi/v/wisardpkg.svg)](https://pypi.org/project/wisardpkg/) [![](https://travis-ci.org/IAZero/wisardpkg.svg?branch=master)](https://travis-ci.org/IAZero/wisardpkg)
+# Symbolicwisardpkg 
+
+
+<!-- [![](https://img.shields.io/pypi/v/wisardpkg.svg)](https://pypi.org/project/wisardpkg/) [![](https://travis-ci.org/IAZero/wisardpkg.svg?branch=master)](https://travis-ci.org/IAZero/wisardpkg) -->
 
 ## Description:
-This is a project to make available the different models based on WiSARD,
-with high performance, easy to use and to install and following a pattern of use.
-These provided models are machine learning models,
-with supervised, unsupervised and semi-supervised learning.
+This project is an extension of the wisardpkg library that expands the WiSARD ecosystem by introducing new models and functionalities while preserving the original design principles of simplicity, performance, and ease of use.
+
+The library provides machine learning models based on the WiSARD architecture, supporting supervised, unsupervised, and semi-supervised learning paradigms. In addition to the classical WiSARD model, this project introduces neuro-symbolic extensions that enable the direct incorporation of symbolic knowledge into weightless neural networks.
+
+The following WiSARD-based models are made available:
+
+      - WiSARD: the classical weightless neural network model based on RAM memories.
+
+      - SWiSARD: a neuro-symbolic extension of WiSARD that allows the direct insertion of logical rules into discriminators, enabling hybrid learning from rules and examples.
+
+      - ClusWiSARD: a clustering-based WiSARD model for unsupervised learning.
+
 
 ## to install:
 python:
@@ -156,9 +167,9 @@ out = clus.classify(X)
 for i,d in enumerate(X):
     print(out[i], d)
 ```
-
+<!-- Ainda tenho que fazer uma documentação
 ## Documentation:
-You can find the complete documentation in the [page](https://iazero.github.io/wisardpkg/).
+You can find the complete documentation in the [page](https://iazero.github.io/wisardpkg/). -->
 
 ## Build on libraries:
 [pybind11](https://github.com/pybind/pybind11)

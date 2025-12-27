@@ -39,7 +39,7 @@ if __name__ == "__main__":
         out.write("/*\n" +\
             "\n"+name+" for c++11" +\
             "\nversion "+ __version__ +\
-            "\nhttps://github.com/IAZero/wisardpkg" +\
+            "\nhttps://github.com/YasminForestti/wisardpkg-symbolic" +\
             "\n*/\n\n")
         out.write("\n#ifndef "+name.upper()+"_HPP\n#define "+name.upper()+"_HPP\n\n")
 

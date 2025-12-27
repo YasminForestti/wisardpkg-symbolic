@@ -5,7 +5,7 @@
 dist/*
 build/*
 tmp/*
-wisardpkg.egg-info/*
+Symbolicwisardpkg.egg-info/*
 
 # cache
 __pycache__
