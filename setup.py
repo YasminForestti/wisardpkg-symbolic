@@ -18,7 +18,7 @@ with open("src/version.h") as f:
     __version__ = line.split('"')[1]
     f.close()
 
-__package_name__ = 'Symbolicwisardpkg'
+__package_name__ = 'symbolicwisardpkg'  # Nome normalizado (minúsculo) para PyPI
 __module_name__ = 'symbolicwisardpkg'  # Nome do módulo Python (deve corresponder ao PYBIND11_MODULE)
 __src__ = 'src/wisard_bind.cc'
 

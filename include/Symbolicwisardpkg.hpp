@@ -1,13 +1,13 @@
 /*
 
-wisardpkg for c++11
-version 1.6.3
-https://github.com/IAZero/wisardpkg
+Symbolicwisardpkg for c++11
+version 0.1.0
+https://github.com/YasminForestti/wisardpkg-symbolic
 */
 
 
-#ifndef WISARDPKG_HPP
-#define WISARDPKG_HPP
+#ifndef SYMBOLICWISARDPKG_HPP
+#define SYMBOLICWISARDPKG_HPP
 
 #include <iostream>
 #include <fstream>
@@ -19,8 +19,19 @@ https://github.com/IAZero/wisardpkg
 #include <unordered_map>
 #include <algorithm>    // std::random_shuffle
 #include <time.h>
+#include <chrono>       // Para alta resolução de tempo
 #include <exception>
 #include <cmath>
+#include <stack>
+#include <cctype>
+
+// Compatibilidade Windows/Unix para getpid()
+#ifdef _WIN32
+    #include <process.h>
+    #define getpid _getpid
+#else
+    #include <unistd.h>
+#endif
 
 /*
 JSON for Modern C++
@@ -17302,9 +17313,9 @@ inline nlohmann::json::json_pointer operator "" _json_pointer(const char* s, std
 #endif
 
 
-namespace wisardpkg {
+namespace Symbolicwisardpkg {
 
-const std::string  __version__ = "1.6.3"; 
+const std::string  __version__ = "0.1.0"; 
 
 
 
@@ -17329,8 +17340,18 @@ class Exception: public std::exception{
         }
 };
 inline int randint(int min, int max, bool isSeed=true){
-  if(isSeed)
-    std::srand(time(NULL));
+  if(isSeed) {
+    // Usar microssegundos para máxima precisão e reduzir colisões
+    auto now = std::chrono::high_resolution_clock::now();
+    auto duration = now.time_since_epoch();
+    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+    
+    // Combinar microssegundos com PID do processo para maior unicidade
+    auto pid = static_cast<unsigned int>(getpid());
+    unsigned int seed = static_cast<unsigned int>(microseconds) ^ pid;
+    
+    std::srand(seed);
+  }
   return min + (std::rand() % (int)(max - min + 1));
 }
 
@@ -17500,6 +17521,42 @@ public:
         for(unsigned int j=0; j<i->second.size(); j++){
           if(i->second[j] >= bleaching){
             labels[i->first]++;
+          }
+        }
+      }
+      if(!bleachingActivated) break;
+      bleaching++;
+      ambiguity = isThereAmbiguity(labels, confidence);
+    }while( std::get<0>(ambiguity) && std::get<1>(ambiguity) > 1 );
+
+    return labels;
+  }
+
+  static std::map<std::string, int> makeConfidencelessWithRules(std::map<std::string,std::vector<int>>& allvotes, const std::map<std::string,std::vector<bool>>& ruleRAMs, const bool bleachingActivated, const int confidence) {
+    std::map<std::string, int> labels;
+    int bleaching = 1;
+    std::tuple<bool,int> ambiguity;
+
+    do{
+      for(std::map<std::string,std::vector<int>>::iterator i=allvotes.begin(); i!=allvotes.end(); ++i){
+        labels[i->first] = 0;
+        // Verificar se há informações sobre RAMs de regra para este discriminador
+        auto ruleRAMsIt = ruleRAMs.find(i->first);
+        bool hasRuleInfo = (ruleRAMsIt != ruleRAMs.end());
+        
+        for(unsigned int j=0; j<i->second.size(); j++){
+          // Verificar se é uma RAM de regra
+          bool isRuleRAM = hasRuleInfo && j < ruleRAMsIt->second.size() && ruleRAMsIt->second[j];
+          
+          if(isRuleRAM){
+            // RAM de regra: sempre contribui com o voto completo, sem verificar bleaching
+            int contribution = i->second[j];
+            labels[i->first] += contribution;
+          } else {
+            // RAM normal: verifica bleaching e contribui com 1 se passar
+            if(i->second[j] >= bleaching){
+              labels[i->first]++;
+            }
           }
         }
       }
@@ -18219,8 +18276,8 @@ private:
 
 class RAM{
 public:
-  RAM(){}
-  RAM(nl::json c){
+  RAM(): isRuleRAM(false){}
+  RAM(nl::json c): isRuleRAM(false){
     ignoreZero = c["ignoreZero"];
     base=c["base"];
     addresses = c["addresses"].get<std::vector<int>>();
@@ -18229,12 +18286,12 @@ public:
     RAMDataHandle handle(c["data"].get<std::string>());
     positions = handle.get(0);
   }
-  RAM(const int addressSize, const int entrySize, const bool ignoreZero=false, int base=2): ignoreZero(ignoreZero), base(base){
+  RAM(const int addressSize, const int entrySize, const bool ignoreZero=false, int base=2): ignoreZero(ignoreZero), base(base), isRuleRAM(false){
     checkLimitAddressSize(addressSize, base);
     addresses = std::vector<int>(addressSize);
     generateRandomAddresses(entrySize);
   }
-  RAM(const std::vector<int> indexes, const bool ignoreZero=false, int base=2): addresses(indexes), ignoreZero(ignoreZero), base(base){
+  RAM(const std::vector<int> indexes, const bool ignoreZero=false, int base=2): addresses(indexes), ignoreZero(ignoreZero), base(base), isRuleRAM(false){
     checkLimitAddressSize(indexes.size(), base);
   }
 
@@ -18246,12 +18303,28 @@ public:
     return getVote<BinInput>(image);
   }
 
+  int getVoteWithRules(const std::vector<int>& image){
+    return getVoteWithRules<std::vector<int>>(image);
+  }
+
+  int getVoteWithRules(const BinInput& image){
+    return getVoteWithRules<BinInput>(image);
+  }
+
   void train(const std::vector<int>& image){
     train<std::vector<int>>(image);
   }
 
   void train(const BinInput& image){
     train<BinInput>(image);
+  }
+
+  void trainWithRules(const std::vector<int>& image){
+    trainWithRules<std::vector<int>>(image);
+  }
+
+  void trainWithRules(const BinInput& image){
+    trainWithRules<BinInput>(image);
   }
 
   void untrain(const std::vector<int>& image){
@@ -18319,6 +18392,18 @@ public:
     return size;
   }
 
+  void setCountAtAddress(addr_t index, content_t value){
+    positions[index] = value;
+  }
+  
+  void setAsRuleRAM(){
+    isRuleRAM = true;
+  }
+  
+  bool getIsRuleRAM() const {
+    return isRuleRAM;
+  }
+
   std::string getRAMInfo(){
     std::string info = "RAM addresses: [";
     for(unsigned int i=0; i<addresses.size(); i++){
@@ -18329,11 +18414,13 @@ public:
     
     info += "Stored positions:\n";
     for(auto it=positions.begin(); it!=positions.end(); ++it){
-      if(it->second > 0){
         info += "  Address " + std::to_string(it->first) + ": count=" + std::to_string(it->second) + "\n";
-      }
     }
     return info;
+  }
+
+  const std::vector<int>& getAddresses() const {
+    return addresses;
   }
 
   ~RAM(){
@@ -18347,6 +18434,10 @@ protected:
     addr_t index = 0;
     addr_t p = 1;
     for(unsigned int i=0; i<addresses.size(); i++){
+      // Verificar se o endereço está dentro dos limites da imagem
+      if(addresses[i] >= image.size()){
+        throw Exception("RAM address index is out of bounds for the given image size!");
+      }
       int bin = image[addresses[i]];
       checkPos(bin);
       index += bin*p;
@@ -18358,6 +18449,39 @@ protected:
   template<typename T>
   void train(const T& image){
     addr_t index = getIndex<T>(image);
+    auto it = positions.find(index);
+    if(it == positions.end()){
+      positions.insert(it,std::pair<addr_t,content_t>(index, 1));
+    }
+    else{
+      it->second++;
+    }
+  }
+
+  template<typename T>
+  void trainWithRules(const T& image){
+    // Verifica se a imagem tem tamanho suficiente para os endereços da RAM
+    if(image.size() <= *std::max_element(addresses.begin(), addresses.end())){
+      return; // Não treina se a imagem for muito pequena
+    }
+    
+    addr_t index = getIndex<T>(image);
+    
+    if(isRuleRAM){
+      // Para RAMs de regras: verifica se a regra foi satisfeita
+      // A regra é satisfeita se o endereço calculado corresponde a uma das combinações
+      // que tornam a regra verdadeira (já preenchidas durante addRuleRAM)
+      auto it = positions.find(index);
+      if(it != positions.end()){
+        // Se a posição existe no mapa, significa que foi preenchida pela regra
+        // Incrementa o contador apenas se a posição já existe
+        it->second++;
+      }
+      // Se a posição não está preenchida, não treina (não satisfaz a regra)
+      return;
+    }
+    
+    // Para RAMs normais, treina normalmente
     auto it = positions.find(index);
     if(it == positions.end()){
       positions.insert(it,std::pair<addr_t,content_t>(index, 1));
@@ -18381,12 +18505,32 @@ protected:
     }
   }
 
+  template<typename T>
+  int getVoteWithRules(const T& image){
+    // Verifica se a imagem tem tamanho suficiente para os endereços da RAM
+    if(image.size() <= *std::max_element(addresses.begin(), addresses.end())){
+      return 0; // Retorna 0 se a imagem for muito pequena
+    }
+    
+    addr_t index = getIndex<T>(image);
+    if(ignoreZero && index == 0)
+      return 0;
+    auto it = positions.find(index);
+    if(it == positions.end()){
+      return 0;
+    }
+    else{
+      return it->second;
+    }
+  }
+
 
 private:
   std::vector<int> addresses;
   ram_t positions;
   bool ignoreZero;
   int base;
+  bool isRuleRAM;
 
   const std::vector<int> convertToBase(const int number) const{
     std::vector<int> numberConverted(addresses.size());
@@ -18489,6 +18633,14 @@ public:
     return _classify<BinInput>(image);
   }
 
+  std::vector<int> classify_with_rules(const std::vector<int>& image) {
+    return _classify_with_rules<std::vector<int>>(image);
+  }
+
+  std::vector<int> classify_with_rules(const BinInput& image) {
+    return _classify_with_rules<BinInput>(image);
+  }
+
   void train(const std::vector<int>& image){
     train<std::vector<int>>(image);
   }
@@ -18500,6 +18652,20 @@ public:
   void train(const std::vector<std::vector<int>>& image){
     for(unsigned int i=0; i<image.size(); i++){
       train(image[i]);
+    }
+  }
+
+  void trainWithRules(const std::vector<int>& image){
+    trainWithRules<std::vector<int>>(image);
+  }
+
+  void trainWithRules(const BinInput& image) {
+    trainWithRules<BinInput>(image);
+  }
+
+  void trainWithRules(const std::vector<std::vector<int>>& image){
+    for(unsigned int i=0; i<image.size(); i++){
+      trainWithRules(image[i]);
     }
   }
 
@@ -18519,6 +18685,24 @@ public:
     return rams.size();
   }
 
+  int getEntrySize() const{
+    return entrySize;
+  }
+
+  std::vector<bool> getRuleRAMsInfo() const{
+    std::vector<bool> ruleRAMs(rams.size());
+    for(unsigned int i=0; i<rams.size(); i++){
+      ruleRAMs[i] = rams[i].getIsRuleRAM();
+    }
+    return ruleRAMs;
+  }
+
+  void expandEntrySize(int newEntrySize){
+    if(newEntrySize > entrySize){
+      entrySize = newEntrySize;
+    }
+  }
+
   std::vector<int> getMentalImage()
   {
     std::vector<int> mentalImage(entrySize, 0);
@@ -18529,16 +18713,6 @@ public:
       }
     }
     return mentalImage;
-  }
-
-  std::string getRAMSInfo(){
-    std::string info = "Discriminator has " + std::to_string(rams.size()) + " RAMs:\n";
-    for(unsigned int i=0; i<rams.size(); i++){
-      info += "RAM " + std::to_string(i) + ":\n";
-      info += rams[i].getRAMInfo();
-      info += "\n";
-    }
-    return info;
   }
 
   std::string jsonConfig(){
@@ -18590,8 +18764,155 @@ public:
     return size;
   }
 
+  std::string getRAMSInfo(){
+    std::string info = "Discriminator has " + std::to_string(rams.size()) + " RAMs:\n";
+    for(unsigned int i=0; i<rams.size(); i++){
+      info += "RAM " + std::to_string(i) + ":\n";
+      info += rams[i].getRAMInfo();
+      info += "\n";
+    }
+    return info;
+  }
+
   ~Discriminator(){
     rams.clear();
+  }
+
+  void addRuleRAM(const std::vector<int>& variableIndexes, const std::vector<int>& ruleValues, int alpha, int base = 2, bool ignoreZero = false){
+    if(variableIndexes.size() != ruleValues.size()){
+      throw Exception("The size of variableIndexes and ruleValues must match!");
+    }
+    checkBase(base);
+    // Ensure entry size supports these indexes
+    int maxIndex = -1;
+    for(unsigned int i=0; i<variableIndexes.size(); i++){
+      if(variableIndexes[i] > maxIndex) maxIndex = variableIndexes[i];
+    }
+
+    if(maxIndex >= getEntrySize()){
+      throw Exception("Rule uses indexes greater than discriminator entry size!");
+    }
+
+    RAM r(variableIndexes, ignoreZero, base);
+    // Compute index from ruleValues in the provided order (base-encoded)
+    addr_t index = 0;
+    addr_t p = 1;
+    for(unsigned int i=0; i<ruleValues.size(); i++){
+      int v = ruleValues[i];
+      if(v < 0 || v >= base){
+        throw Exception("Rule value is out of range for the selected base!");
+      }
+      index += (addr_t)v * p;
+      p *= base;
+    }
+    r.setCountAtAddress(index, (content_t)alpha);
+    r.setAsRuleRAM(); // Marcar como RAM de regra
+    rams.push_back(r);
+  }
+
+  void addRuleRAM(const std::vector<int>& variableIndexes, const std::vector<std::vector<int>>& multipleRuleValues, int alpha, int base = 2, bool ignoreZero = false){
+    if(multipleRuleValues.empty()){
+      throw Exception("multipleRuleValues cannot be empty!");
+    }
+    checkBase(base);
+    // Ensure entry size supports these indexes
+    int maxIndex = -1;
+    for(unsigned int i=0; i<variableIndexes.size(); i++){
+      if(variableIndexes[i] > maxIndex) maxIndex = variableIndexes[i];
+    }
+
+     if(maxIndex >= getEntrySize()){
+       throw Exception("Rule uses indexes greater than discriminator entry size!");
+     }
+
+    // Create a single RAM for all rule values
+    RAM r(variableIndexes, ignoreZero, base);
+    
+    // Process each rule value set
+    for(unsigned int ruleIdx = 0; ruleIdx < multipleRuleValues.size(); ruleIdx++){
+      const std::vector<int>& ruleValues = multipleRuleValues[ruleIdx];
+      
+      if(variableIndexes.size() != ruleValues.size()){
+        throw Exception("The size of variableIndexes and ruleValues must match for each rule!");
+      }
+      
+      // Compute index from ruleValues in the provided order (base-encoded)
+      addr_t index = 0;
+      addr_t p = 1;
+      for(unsigned int i=0; i<ruleValues.size(); i++){
+        int v = ruleValues[i];
+        if(v < 0 || v >= base){
+          throw Exception("Rule value is out of range for the selected base!");
+        }
+        index += (addr_t)v * p;
+        p *= base;
+      }
+      r.setCountAtAddress(index, (content_t)alpha);
+    }
+    r.setAsRuleRAM(); // Marcar como RAM de regra
+    rams.push_back(r);
+  }
+
+  void ensureNormalRAMs(int addressSize, int imageSize, bool ignoreZero, bool completeAddressing, int base, bool useRandomMapping = true){
+    // Atualizar entrySize para o tamanho da imagem
+    entrySize = imageSize;
+    
+    if(useRandomMapping){
+      // Verificar se já existem RAMs normais (não apenas regras)
+      // Se não existirem, criar RAMs normais baseadas no tamanho da imagem
+      if(true){ // Sempre criar RAMs normais quando useRandomMapping é true
+        // Verificar se já existem RAMs normais para evitar duplicação
+        bool hasNormal = false;
+        for(unsigned int i=0; i<rams.size(); i++){
+          if(!rams[i].getIsRuleRAM()){
+            hasNormal = true;
+            break;
+          }
+        }
+        
+        if(!hasNormal){
+        // Criar RAMs normais manualmente para evitar problemas de verificação
+        int numberOfRAMS = imageSize / addressSize;
+        int remain = imageSize % addressSize;
+        int indexesSize = imageSize;
+        if(completeAddressing && remain > 0) {
+          numberOfRAMS++;
+          indexesSize += addressSize-remain;
+        }
+
+        // Criar índices para as RAMs normais
+        std::vector<int> indexes(indexesSize);
+        for(int i=0; i<imageSize; i++) {
+          indexes[i]=i;
+        }
+        for(unsigned int i=imageSize; i<indexes.size(); i++){
+          indexes[i] = randint(0, imageSize-1, false);
+        }
+        random_shuffle(indexes.begin(), indexes.end());
+
+        // Criar RAMs normais
+        for(int i=0; i<numberOfRAMS; i++){
+          std::vector<int> subIndexes(indexes.begin() + (i*addressSize), indexes.begin() + ((i+1)*addressSize));
+          rams.push_back(RAM(subIndexes, ignoreZero, base));
+        }
+        }
+      }
+    }
+    // Se useRandomMapping = false, não criar RAMs normais aqui
+    // Elas já foram criadas pelo mapeamento existente
+  }
+
+  bool hasNormalRAMs(int addressSize){
+    // Verificar se existem RAMs normais
+    // RAMs normais têm tamanho igual ao addressSize
+    // RAMs de regras têm tamanho diferente (baseado nas variáveis da regra)
+    for(unsigned int i=0; i<rams.size(); i++){
+      // RAMs normais têm tamanho igual ao addressSize
+      if(rams[i].getAddresses().size() == addressSize){
+        return true;
+      }
+    }
+    return false;
   }
 
 protected:
@@ -18720,6 +19041,16 @@ protected:
     return votes;
   }
 
+  template<typename T>
+  std::vector<int> _classify_with_rules(const T& image) {
+    // Não verifica entrySize para permitir RAMs de tamanhos variados
+    std::vector<int> votes(rams.size());
+    for(unsigned int i=0; i<rams.size(); i++){
+      votes[i] = rams[i].getVoteWithRules(image);
+    }
+    return votes;
+  }
+
   void setMapping(std::vector<std::vector<int>>& mapping){
     int size = rams.size();
     for(int i=0; i<size; i++){
@@ -18746,6 +19077,19 @@ protected:
     count++;
     for(unsigned int i=0; i<rams.size(); i++){
       rams[i].train(image);
+    }
+  }
+
+  template<typename T>
+  void trainWithRules(const T& image) {
+    count++;
+    for(unsigned int i=0; i<rams.size(); i++){
+      // Verificar se é uma RAM de regra antes de treinar
+      if(rams[i].getIsRuleRAM()){
+        rams[i].trainWithRules(image);
+      }else{
+        rams[i].train(image);
+      }
     }
   }
 
@@ -18798,6 +19142,235 @@ private:
   int count;
   std::vector<RAM> rams;
 };
+
+// Enum para representar os tipos de token
+enum TokenType {
+    VARIABLE,
+    OPERATOR,
+    PARENTHESIS
+};
+
+// Estrutura para um token
+struct Token {
+    std::string value;
+    TokenType type;
+};
+
+class RuleCompiler {
+public:
+    // Construtor
+    RuleCompiler() {}
+    
+    // Compila uma regra booleana e retorna todas as combinações que a tornam verdadeira
+    std::vector<std::vector<int>> compileRule(const std::string& rule, const std::map<std::string, int>& variableIndexes);
+    
+private:
+    // Função para verificar se um caractere é parte de um nome de variável
+    bool isVariableChar(char c);
+    
+    // Tokeniza a string de expressão
+    std::vector<Token> tokenize(const std::string& expression);
+    
+    // Precedência dos operadores
+    int precedence(const std::string& op);
+    
+    // Converte a lista de tokens para notação pós-fixa (RPN)
+    std::vector<Token> infixToPostfix(const std::vector<Token>& infixTokens);
+    
+    // Avalia a expressão em notação pós-fixa
+    bool evaluatePostfix(const std::vector<Token>& postfixTokens, const std::map<std::string, bool>& values);
+    
+    // Gera todas as combinações possíveis de valores para as variáveis
+    std::vector<std::map<std::string, bool>> generateAllCombinations(const std::vector<std::string>& variables);
+};
+
+bool RuleCompiler::isVariableChar(char c) {
+    return isalnum(c) || c == '_';
+}
+
+std::vector<Token> RuleCompiler::tokenize(const std::string& expression) {
+    std::vector<Token> tokens;
+    for (size_t i = 0; i < expression.length(); ) {
+        char c = expression[i];
+        if (isspace(c)) {
+            i++;
+            continue;
+        }
+
+        if (c == '+' || c == '*' || c == '!') {
+            tokens.push_back({std::string(1, c), OPERATOR});
+            i++;
+        } else if (c == '(' || c == ')') {
+            tokens.push_back({std::string(1, c), PARENTHESIS});
+            i++;
+        } else if (isalpha(c) || c == '_') {
+            std::string varName = "";
+            while (i < expression.length() && isVariableChar(expression[i])) {
+                varName += expression[i];
+                i++;
+            }
+            tokens.push_back({varName, VARIABLE});
+        } else {
+            // Caractere desconhecido
+            throw Exception(("Caractere invalido na expressao: " + std::string(1, c)).c_str());
+        }
+    }
+    return tokens;
+}
+
+int RuleCompiler::precedence(const std::string& op) {
+    if (op == "!") return 3;
+    if (op == "*") return 2;
+    if (op == "+") return 1;
+    return 0;
+}
+
+std::vector<Token> RuleCompiler::infixToPostfix(const std::vector<Token>& infixTokens) {
+    std::vector<Token> postfixTokens;
+    std::stack<Token> opStack;
+
+    for (const auto& token : infixTokens) {
+        if (token.type == VARIABLE) {
+            postfixTokens.push_back(token);
+        } else if (token.value == "(") {
+            opStack.push(token);
+        } else if (token.value == ")") {
+            while (!opStack.empty() && opStack.top().value != "(") {
+                postfixTokens.push_back(opStack.top());
+                opStack.pop();
+            }
+            if (!opStack.empty()) opStack.pop(); // Remove o '('
+        } else if (token.type == OPERATOR) {
+            while (!opStack.empty() && opStack.top().type == OPERATOR && precedence(opStack.top().value) >= precedence(token.value)) {
+                postfixTokens.push_back(opStack.top());
+                opStack.pop();
+            }
+            opStack.push(token);
+        }
+    }
+
+    while (!opStack.empty()) {
+        postfixTokens.push_back(opStack.top());
+        opStack.pop();
+    }
+    return postfixTokens;
+}
+
+bool RuleCompiler::evaluatePostfix(const std::vector<Token>& postfixTokens, const std::map<std::string, bool>& values) {
+    std::stack<bool> operandStack;
+
+    for (const auto& token : postfixTokens) {
+        if (token.type == VARIABLE) {
+            if (values.count(token.value)) {
+                operandStack.push(values.at(token.value));
+            } else {
+                throw Exception(("Variavel nao encontrada: " + token.value).c_str());
+            }
+        } else if (token.value == "!") {
+            if (operandStack.empty()) { 
+                throw Exception("Erro de expressao (NOT)."); 
+            }
+            bool val = operandStack.top();
+            operandStack.pop();
+            operandStack.push(!val);
+        } else if (token.value == "*" || token.value == "+") {
+            if (operandStack.size() < 2) { 
+                throw Exception(("Erro de expressao (" + token.value + ").").c_str()); 
+            }
+            bool right = operandStack.top();
+            operandStack.pop();
+            bool left = operandStack.top();
+            operandStack.pop();
+
+            if (token.value == "*") { // AND
+                operandStack.push(left && right);
+            } else { // OR
+                operandStack.push(left || right);
+            }
+        }
+    }
+
+    if (operandStack.size() != 1) { 
+        throw Exception("Erro de expressao final."); 
+    }
+    return operandStack.top();
+}
+
+std::vector<std::map<std::string, bool>> RuleCompiler::generateAllCombinations(const std::vector<std::string>& variables) {
+    std::vector<std::map<std::string, bool>> combinations;
+    int numVariables = variables.size();
+    int numCombinations = 1 << numVariables;
+
+    for (int i = 0; i < numCombinations; ++i) {
+        std::map<std::string, bool> combination;
+        for (int j = 0; j < numVariables; ++j) {
+            bool value = (i >> j) & 1;
+            combination[variables[j]] = value;
+        }
+        combinations.push_back(combination);
+    }
+    return combinations;
+}
+
+std::vector<std::vector<int>> RuleCompiler::compileRule(const std::string& rule, const std::map<std::string, int>& variableIndexes) {
+    // Etapa 1: Tokenização
+    std::vector<Token> infixTokens = tokenize(rule);
+
+    // Etapa 2: Encontrar as variáveis na regra
+    std::vector<std::string> variables;
+    for (const auto& token : infixTokens) {
+        if (token.type == VARIABLE) {
+            bool found = false;
+            for(const auto& var : variables) {
+                if(var == token.value) {
+                    found = true;
+                    break;
+                }
+            }
+            if(!found) {
+                // Verificar se a variável existe no variableIndexes
+                if (variableIndexes.find(token.value) == variableIndexes.end()) {
+                    throw Exception(("Variavel '" + token.value + "' nao encontrada no variableIndexes").c_str());
+                }
+                variables.push_back(token.value);
+            }
+        }
+    }
+    std::sort(variables.begin(), variables.end());
+
+    // Etapa 3: Converter para notação pós-fixa
+    std::vector<Token> postfixTokens = infixToPostfix(infixTokens);
+
+    // Etapa 4: Gerar todas as combinações
+    std::vector<std::map<std::string, bool>> allCombinations = generateAllCombinations(variables);
+
+    // Etapa 5: Avaliar cada combinação e coletar as que tornam a regra verdadeira
+    std::vector<std::vector<int>> trueCombinations;
+    
+    for (const auto& combination : allCombinations) {
+        bool result = evaluatePostfix(postfixTokens, combination);
+        if (result) {
+            // Converter a combinação para o formato esperado pelo WiSARD
+            // Ordenar as variáveis pela ordem dos índices
+            std::vector<std::pair<std::string, int>> sortedVars;
+            for (const auto& var : variables) {
+                sortedVars.push_back({var, variableIndexes.at(var)});
+            }
+            std::sort(sortedVars.begin(), sortedVars.end(), 
+                [](const std::pair<std::string, int>& a, const std::pair<std::string, int>& b) {
+                    return a.second < b.second;
+                });
+            
+            std::vector<int> ruleValues;
+            for (const auto& varPair : sortedVars) {
+                ruleValues.push_back(combination.at(varPair.first) ? 1 : 0);
+            }
+            trueCombinations.push_back(ruleValues);
+        }
+    }
+
+    return trueCombinations;
+}
 
 class Wisard{
 public:
@@ -18882,6 +19455,15 @@ public:
     }
   }
 
+  void trainWithRules(const DataSet& dataset) {
+    int numberOfRAMS = calculateNumberOfRams(dataset[0].size(), addressSize, completeAddressing);
+    checkConfidence(numberOfRAMS);
+    for(size_t i=0; i<dataset.size(); i++){
+      if(verbose) std::cout << "\rtraining with rules " << i+1 << " of " << dataset.size();
+      trainWithRules<BinInput>(dataset[i], dataset.getLabel(i));
+    }
+  }
+
   void train(const std::vector<std::vector<int>>& images, const std::vector<std::string>& labels){
     int numberOfRAMS = calculateNumberOfRams(images[0].size(), addressSize, completeAddressing);
     checkConfidence(numberOfRAMS);
@@ -18893,12 +19475,31 @@ public:
     if(verbose) std::cout << "\r" << std::endl;
   }
 
+  void trainWithRules(const std::vector<std::vector<int>>& images, const std::vector<std::string>& labels){
+    int numberOfRAMS = calculateNumberOfRams(images[0].size(), addressSize, completeAddressing);
+    checkConfidence(numberOfRAMS);
+    checkInputSizes(images.size(), labels.size());
+    for(unsigned int i=0; i<images.size(); i++){
+      if(verbose) std::cout << "\rtraining with rules " << i+1 << " of " << images.size();
+      trainWithRules<std::vector<int>>(images[i], labels[i]);
+    }
+    if(verbose) std::cout << "\r" << std::endl;
+  }
+
   std::vector<std::string> classify(const std::vector<std::vector<int>>& images){
     return _classify<std::vector<std::vector<int>>>(images);
   }
 
   std::vector<std::string> classify(const DataSet& images){
     return _classify<DataSet>(images);
+  }
+
+  std::vector<std::string> classify_with_rules(const std::vector<std::vector<int>>& images){
+    return _classify_with_rules<std::vector<std::vector<int>>>(images);
+  }
+
+  std::vector<std::string> classify_with_rules(const DataSet& images){
+    return _classify_with_rules<DataSet>(images);
   }
 
   void leaveOneOut(const std::vector<int>& image, const std::string& label){
@@ -18954,6 +19555,74 @@ public:
     return json(false,"");
   }
 
+  void addRule(const std::string& label, const std::vector<int>& variableIndexes, const std::vector<std::vector<int>>& multipleRuleValues, int alpha, int basein = 2, bool ignoreZeroIn = false){
+    if(discriminators.find(label) == discriminators.end()){
+      // Criar discriminador considerando mapeamento existente se disponível
+      int inferredEntrySize = 0;
+      if(variableIndexes.size() > 0){
+        inferredEntrySize = *std::max_element(variableIndexes.begin(), variableIndexes.end()) + 1;
+      }
+      // Garantir que entrySize seja pelo menos addressSize
+      if(inferredEntrySize < addressSize){
+        inferredEntrySize = addressSize;
+      }
+      
+      // Se há mapeamento, usar o tamanho real dos dados baseado no mapeamento
+      auto it = mapping.find(label);
+      if (it != mapping.end()) {
+        // Calcular o tamanho real baseado no mapeamento
+        int maxIndexInMapping = 0;
+        for (const auto& tuple : it->second) {
+          for (int index : tuple) {
+            if (index > maxIndexInMapping) {
+              maxIndexInMapping = index;
+            }
+          }
+        }
+        // O entrySize deve ser pelo menos maxIndexInMapping + 1
+        inferredEntrySize = maxIndexInMapping + 1;
+      }
+      
+      // Verificar se existe mapeamento para esta classe
+      if (it != mapping.end())
+      {
+        // Usar mapeamento existente
+        discriminators[label] = Discriminator(it->second, inferredEntrySize, ignoreZero, base);
+      }
+      else
+      {
+        // Criar discriminador vazio apenas para regras
+        // O entrySize será expandido quando trainWithRules() for chamado
+        discriminators[label] = Discriminator(inferredEntrySize);
+      }
+    }
+    discriminators[label].addRuleRAM(variableIndexes, multipleRuleValues, alpha, basein, ignoreZeroIn);
+  }
+
+  void addRule(const std::string& label, const std::map<std::string, int>& variableIndexes, const std::string& rule, int alpha, int basein = 2, bool ignoreZeroIn = false){
+    // Converter map para vector de índices ordenados
+    std::vector<std::pair<std::string, int>> sortedVars;
+    for (const auto& pair : variableIndexes) {
+      sortedVars.push_back(pair);
+    }
+    std::sort(sortedVars.begin(), sortedVars.end(), 
+        [](const std::pair<std::string, int>& a, const std::pair<std::string, int>& b) {
+            return a.second < b.second;
+        });
+    
+    std::vector<int> indexes;
+    for (const auto& pair : sortedVars) {
+      indexes.push_back(pair.second);
+    }
+    
+    // Compilar a regra booleana
+    RuleCompiler compiler;
+    std::vector<std::vector<int>> ruleValues = compiler.compileRule(rule, variableIndexes);
+    
+    // Usar a função existente com os valores compilados
+    addRule(label, indexes, ruleValues, alpha, basein, ignoreZeroIn);
+  }
+
 
 protected:
   template<typename T>
@@ -18961,7 +19630,40 @@ protected:
     if(discriminators.find(label) == discriminators.end()){
       makeDiscriminator(label, image.size());
     }
+    else {
+      // Se o discriminador já existe (pode ter regras), adicionar RAMs normais se necessário
+      // Verificar se este discriminador foi criado com mapeamento
+      bool hasMapping = mapping.find(label) != mapping.end();
+      discriminators[label].ensureNormalRAMs(addressSize, image.size(), ignoreZero, completeAddressing, base, !hasMapping);
+    }
     discriminators[label].train(image);
+  }
+
+  template<typename T>
+  void trainWithRules(const T& image, const std::string& label){
+    if(discriminators.find(label) == discriminators.end()){
+      // Seguir a mesma lógica da função train: criar discriminador com tamanho da imagem
+      makeDiscriminator(label, image.size());
+    }
+    else {
+      // Se o discriminador já existe (pode ter regras), expandir entrySize se necessário
+      if(discriminators[label].getEntrySize() < image.size()){
+        discriminators[label].expandEntrySize(image.size());
+      }
+      // Adicionar RAMs normais se necessário
+      // Verificar se este discriminador foi criado com mapeamento
+      bool hasMapping = mapping.find(label) != mapping.end();
+      if(!hasMapping){
+        // Se não há mapeamento, sempre criar RAMs normais
+        discriminators[label].ensureNormalRAMs(addressSize, image.size(), ignoreZero, completeAddressing, base, true);
+      }
+      else {
+        // Se há mapeamento, não criar RAMs normais (elas já existem)
+        discriminators[label].ensureNormalRAMs(addressSize, image.size(), ignoreZero, completeAddressing, base, false);
+      }
+    }
+
+    discriminators[label].trainWithRules(image);
   }
 
   template<typename T>
@@ -18978,12 +19680,53 @@ protected:
     return labels;
   }
 
+  template<typename T>
+  std::vector<std::string> _classify_with_rules(const T& images){
+    std::vector<std::string> labels(images.size());
+
+    for(unsigned int i=0; i<images.size(); i++){
+      if(verbose) std::cout << "\rclassifying with rules " << i+1 << " of " << images.size();
+      std::map<std::string,int> candidates = classify_with_rules_single(images[i], searchBestConfidence);
+      
+      if(verbose) {
+        std::cout << "\n=== DEBUG: Classificação da imagem " << i+1 << " ===" << std::endl;
+        std::cout << "Imagem: [";
+        for(size_t j=0; j<images[i].size(); j++){
+          std::cout << images[i][j];
+          if(j < images[i].size()-1) std::cout << ", ";
+        }
+        std::cout << "]" << std::endl;
+        
+        // Mostrar votações de cada discriminador
+        for(auto& candidate : candidates){
+          std::cout << "Discriminador '" << candidate.first << "': " << candidate.second << " votos" << std::endl;
+        }
+        
+        std::string winner = Bleaching::getBiggestCandidate(candidates);
+        std::cout << "Classe vencedora: " << winner << std::endl;
+        std::cout << "=================================" << std::endl;
+      }
+      
+      labels[i] = Bleaching::getBiggestCandidate(candidates);
+    }
+    if(verbose) std::cout << "\r" << std::endl;
+    return labels;
+  }
+
   std::map<std::string, int> classify(const std::vector<int>& image, bool searchBestConfidence=false){
     return __classify<std::vector<int>>(image,searchBestConfidence);
   }
 
   std::map<std::string, int> classify(const BinInput& image, bool searchBestConfidence=false){
     return __classify<BinInput>(image,searchBestConfidence);
+  }
+
+  std::map<std::string, int> classify_with_rules_single(const std::vector<int>& image, bool searchBestConfidence=false){
+    return __classify_with_rules<std::vector<int>>(image, searchBestConfidence);
+  }
+
+  std::map<std::string, int> classify_with_rules_single(const BinInput& image, bool searchBestConfidence=false){
+    return __classify_with_rules<BinInput>(image, searchBestConfidence);
   }
 
   template<typename T>
@@ -18994,6 +19737,37 @@ protected:
       allvotes[i->first] = i->second.classify(image);
     }
     return Bleaching::make(allvotes, bleachingActivated, searchBestConfidence, confidence);
+  }
+
+  template<typename T>
+  std::map<std::string, int> __classify_with_rules(const T& image, bool searchBestConfidence=false){
+    std::map<std::string,std::vector<int>> allvotes;
+    std::map<std::string,std::vector<bool>> ruleRAMs;
+
+    for(std::map<std::string,Discriminator>::iterator i=discriminators.begin(); i!=discriminators.end(); ++i){
+      allvotes[i->first] = i->second.classify_with_rules(image);
+      ruleRAMs[i->first] = i->second.getRuleRAMsInfo();
+      
+      if(verbose) {
+        std::cout << "  Discriminador '" << i->first << "':" << std::endl;
+        std::vector<int> votes = allvotes[i->first];
+        int total_votes = 0;
+        for(size_t j=0; j<votes.size(); j++){
+          std::cout << "    RAM " << j << ": " << votes[j] << " votos" << std::endl;
+          total_votes += votes[j];
+        }
+        std::cout << "    Total: " << total_votes << " votos" << std::endl;
+      }
+    }
+    
+    if(searchBestConfidence){
+      // Para searchBestConfidence, usar a função normal por enquanto
+      return Bleaching::make(allvotes, bleachingActivated, searchBestConfidence, confidence);
+    }
+    else{
+      // Usar a nova função que trata RAMs de regra de forma diferente
+      return Bleaching::makeConfidencelessWithRules(allvotes, ruleRAMs, bleachingActivated, confidence);
+    }
   }
 
   nl::json getClassesJSON(bool huge, std::string path){
@@ -19037,12 +19811,9 @@ protected:
     {
       discriminators[label] = Discriminator(it->second, entrySize, ignoreZero, base);
     }
-    else if (indexes.size() != 0)
-    {
-      discriminators[label] = Discriminator(indexes, addressSize, entrySize, ignoreZero, base);
-    }
     else
     {
+      // Sempre usar setRAMShuffle com completeAddressing para garantir mapeamento correto
       discriminators[label] = Discriminator(addressSize, entrySize, ignoreZero, completeAddressing, base);
     }
   }

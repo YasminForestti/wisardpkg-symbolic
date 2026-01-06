@@ -1,4 +1,4 @@
-name = 'wisardpkg'
+name = 'Symbolicwisardpkg'
 src = 'src/'
 output = 'include/'
 stdIncludes = 'base.h'

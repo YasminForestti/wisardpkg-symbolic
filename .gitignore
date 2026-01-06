@@ -13,3 +13,6 @@ __pycache__
 # data
 *.wdpkg
 *.wpkds
+
+#PYPI
+*.pypirc
