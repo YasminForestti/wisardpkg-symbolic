@@ -19615,11 +19615,15 @@ public:
       indexes.push_back(pair.second);
     }
     
-    // Compilar a regra booleana
+
     RuleCompiler compiler;
     std::vector<std::vector<int>> ruleValues = compiler.compileRule(rule, variableIndexes);
     
-    // Usar a função existente com os valores compilados
+
+    if(ruleValues.empty()){
+      throw Exception("The boolean rule has no valid combinations that make it true! Please check for logical contradictions in the rule.");
+    }
+ 
     addRule(label, indexes, ruleValues, alpha, basein, ignoreZeroIn);
   }
 
