@@ -451,6 +451,16 @@ public:
         // O entrySize será expandido quando trainWithRules() for chamado
         discriminators[label] = Discriminator(inferredEntrySize);
       }
+    } else {
+      // Discriminador já existe - verificar se precisa expandir entrySize
+      int maxIndex = -1;
+      if(variableIndexes.size() > 0){
+        maxIndex = *std::max_element(variableIndexes.begin(), variableIndexes.end());
+      }
+      int requiredEntrySize = maxIndex + 1;
+      if(requiredEntrySize > discriminators[label].getEntrySize()){
+        discriminators[label].expandEntrySize(requiredEntrySize);
+      }
     }
     discriminators[label].addRuleRAM(variableIndexes, multipleRuleValues, alpha, basein, ignoreZeroIn);
   }
