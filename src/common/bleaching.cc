@@ -43,6 +43,8 @@ public:
     std::tuple<bool,int> ambiguity;
 
     do{
+      bool hasNormalRAMsContributing = false;
+      
       for(std::map<std::string,std::vector<int>>::iterator i=allvotes.begin(); i!=allvotes.end(); ++i){
         labels[i->first] = 0;
         // Verificar se há informações sobre RAMs de regra para este discriminador
@@ -61,11 +63,15 @@ public:
             // RAM normal: verifica bleaching e contribui com 1 se passar
             if(i->second[j] >= bleaching){
               labels[i->first]++;
+              hasNormalRAMsContributing = true;
             }
           }
         }
       }
+      
       if(!bleachingActivated) break;
+      if(!hasNormalRAMsContributing) break;
+      
       bleaching++;
       ambiguity = isThereAmbiguity(labels, confidence);
     }while( std::get<0>(ambiguity) && std::get<1>(ambiguity) > 1 );
