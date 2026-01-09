@@ -17542,16 +17542,14 @@ public:
       
       for(std::map<std::string,std::vector<int>>::iterator i=allvotes.begin(); i!=allvotes.end(); ++i){
         labels[i->first] = 0;
-        // Verificar se há informações sobre RAMs de regra para este discriminador
         auto ruleRAMsIt = ruleRAMs.find(i->first);
         bool hasRuleInfo = (ruleRAMsIt != ruleRAMs.end());
         
         for(unsigned int j=0; j<i->second.size(); j++){
-          // Verificar se é uma RAM de regra
           bool isRuleRAM = hasRuleInfo && j < ruleRAMsIt->second.size() && ruleRAMsIt->second[j];
           
           if(isRuleRAM){
-            // RAM de regra: sempre contribui com o voto completo, sem verificar bleaching
+            // RAM de regra: sempre contribui com o voto completo
             int contribution = i->second[j];
             labels[i->first] += contribution;
           } else {
@@ -17566,13 +17564,19 @@ public:
       
       if(!bleachingActivated) break;
       
-      // Parar se não há mais RAMs normais contribuindo
-      // Neste ponto, apenas RAMs de regra estão contribuindo e não serão afetadas pelo bleaching
+      // Se não há mais RAMs normais contribuindo, parar imediatamente
+      // Neste ponto, apenas RAMs de regra estão contribuindo
+      // A classe vencedora será aquela com maior labels[classe]
       if(!hasNormalRAMsContributing) break;
       
-      bleaching++;
+      // Verificar ambiguidade apenas se ainda há RAMs normais contribuindo
       ambiguity = isThereAmbiguity(labels, confidence);
-    }while( std::get<0>(ambiguity) && std::get<1>(ambiguity) > 1 );
+      
+      // Se não há ambiguidade, não precisa continuar
+      if(!std::get<0>(ambiguity)) break;
+      
+      bleaching++;
+    }while( std::get<1>(ambiguity) > 1 );
 
     return labels;
   }
