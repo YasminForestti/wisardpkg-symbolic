@@ -105,10 +105,14 @@ public:
     }
   }
 
-  void untrain(const std::vector<int>& image){
+  void untrain(const std::vector<int>& image, bool considerRules = true){
       checkEntrySize(image.size());
       count--;
       for(unsigned int i=0; i<rams.size(); i++){
+        // Se considerRules é false, ignora RAMs de regra
+        if(!considerRules && rams[i].getIsRuleRAM()){
+          continue;
+        }
         rams[i].untrain(image);
       }
   }
@@ -512,7 +516,10 @@ protected:
     checkEntrySize(image.size());
     count++;
     for(unsigned int i=0; i<rams.size(); i++){
-      rams[i].train(image);
+      bool isRule = rams[i].getIsRuleRAM();
+      if(!isRule){
+        rams[i].train(image);
+      }
     }
   }
 

@@ -358,18 +358,18 @@ public:
     return _classify_with_rules<DataSet>(images);
   }
 
-  void leaveOneOut(const std::vector<int>& image, const std::string& label){
+  void leaveOneOut(const std::vector<int>& image, const std::string& label, bool considerRules = true){
     auto d = discriminators.find(label);
     if(d != discriminators.end()){
-      d->second.untrain(image);
+      d->second.untrain(image, considerRules);
     }
   }
 
-  void leaveMoreOut(const std::vector<std::vector<int>>& images, const std::vector<std::string>& labels){
+  void leaveMoreOut(const std::vector<std::vector<int>>& images, const std::vector<std::string>& labels, bool considerRules = false){
     checkInputSizes(images.size(), labels.size());
     for(unsigned int i=0; i<images.size(); i++){
       if(verbose) std::cout << "\runtraining " << i+1 << " of " << images.size();
-      leaveOneOut(images[i], labels[i]);
+      leaveOneOut(images[i], labels[i], considerRules);
     }
     if(verbose) std::cout << "\r" << std::endl;
   }
@@ -447,8 +447,6 @@ public:
       }
       else
       {
-        // Criar discriminador vazio apenas para regras
-        // O entrySize será expandido quando trainWithRules() for chamado
         discriminators[label] = Discriminator(inferredEntrySize);
       }
     } else {
