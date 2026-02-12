@@ -1,4 +1,4 @@
-# SWiSARD (Symbolic WiSARD) User Manual
+# SWiSARD (Symbolic WiSARD)
 
 ## Table of Contents
 
