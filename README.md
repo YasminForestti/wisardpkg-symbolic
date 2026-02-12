@@ -20,37 +20,32 @@ The following WiSARD-based models are made available:
 ## to install:
 python:
 ```
-pip install Symbolicwisardpkg
+pip install symbolicwisardpkg
 ```
-Works to python2 and pyhton3.  
+Works to pyhton3.  
 If you are on Linux and not in a virtual environment, you may need to run as superuser.
 
 #### obs:
 To install on windows platform you can use [anaconda](https://anaconda.org/) and do:
 ```
-python -m pip install Symbolicwisardpkg
+python -m pip install symbolicwisardpkg
 ```
-c++:
+
+<!-- c++:
 copy the file Symbolicwisardpkg.hpp inside your project 
 ```
 include/Symbolicwisardpkg.hpp
-```
+``` -->
 
 ## to uninstall:
 ```
-pip uninstall Symbolicwisardpkg
+pip uninstall symbolicwisardpkg
 ```
 
 ## to import:
 python:
 ```python
-import Symbolicwisardpkg as wp
-```
-c++:
-```c++
-# include "Symbolicwisardpkg.hpp"
-
-namespace wp = Symbolicwisardpkg;
+import symbolicwisardpkg as wp
 ```
 
 ## to use:
