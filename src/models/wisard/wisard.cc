@@ -12,6 +12,9 @@ struct Token {
     TokenType type;
 };
 
+// Resultado da avaliação parcial (backtracking + pruning)
+enum class PartialResult { FALSE, TRUE, UNKNOWN };
+
 class RuleCompiler {
 public:
     // Construtor
@@ -33,11 +36,14 @@ private:
     // Converte a lista de tokens para notação pós-fixa (RPN)
     std::vector<Token> infixToPostfix(const std::vector<Token>& infixTokens);
     
-    // Avalia a expressão em notação pós-fixa
+    // Avalia a expressão em notação pós-fixa (atribuição completa)
     bool evaluatePostfix(const std::vector<Token>& postfixTokens, const std::map<std::string, bool>& values);
     
-    // Gera todas as combinações possíveis de valores para as variáveis
-    std::vector<std::map<std::string, bool>> generateAllCombinations(const std::vector<std::string>& variables);
+    // Avalia a expressão em notação pós-fixa com atribuição parcial (variáveis não atribuídas = UNKNOWN)
+    PartialResult evaluatePostfixPartial(const std::vector<Token>& postfixTokens, const std::map<std::string, bool>& partialValues, const std::vector<std::string>& variables);
+    
+    // Backtracking + pruning: enumera apenas combinações que satisfazem a regra
+    void backtrack(const std::vector<Token>& postfixTokens, const std::vector<std::string>& variables, const std::map<std::string, int>& variableIndexes, const std::vector<std::pair<std::string, int>>& sortedVars, std::map<std::string, bool>& partialAssignment, int depth, std::vector<std::vector<int>>& trueCombinations);
 };
 
 bool RuleCompiler::isVariableChar(char c) {
@@ -152,20 +158,96 @@ bool RuleCompiler::evaluatePostfix(const std::vector<Token>& postfixTokens, cons
     return operandStack.top();
 }
 
-std::vector<std::map<std::string, bool>> RuleCompiler::generateAllCombinations(const std::vector<std::string>& variables) {
-    std::vector<std::map<std::string, bool>> combinations;
-    int numVariables = variables.size();
-    int numCombinations = 1 << numVariables;
+PartialResult RuleCompiler::evaluatePostfixPartial(const std::vector<Token>& postfixTokens, const std::map<std::string, bool>& partialValues, const std::vector<std::string>& variables) {
+    std::stack<PartialResult> operandStack;
 
-    for (int i = 0; i < numCombinations; ++i) {
-        std::map<std::string, bool> combination;
-        for (int j = 0; j < numVariables; ++j) {
-            bool value = (i >> j) & 1;
-            combination[variables[j]] = value;
+    for (const auto& token : postfixTokens) {
+        if (token.type == VARIABLE) {
+            auto it = partialValues.find(token.value);
+            if (it != partialValues.end()) {
+                operandStack.push(it->second ? PartialResult::TRUE : PartialResult::FALSE);
+            } else {
+                operandStack.push(PartialResult::UNKNOWN);
+            }
+        } else if (token.value == "!") {
+            PartialResult val = operandStack.top();
+            operandStack.pop();
+            if (val == PartialResult::FALSE) operandStack.push(PartialResult::TRUE);
+            else if (val == PartialResult::TRUE) operandStack.push(PartialResult::FALSE);
+            else operandStack.push(PartialResult::UNKNOWN);
+        } else if (token.value == "*" || token.value == "+") {
+            PartialResult right = operandStack.top();
+            operandStack.pop();
+            PartialResult left = operandStack.top();
+            operandStack.pop();
+
+            if (token.value == "*") { // AND
+                if (left == PartialResult::FALSE || right == PartialResult::FALSE)
+                    operandStack.push(PartialResult::FALSE);
+                else if (left == PartialResult::TRUE && right == PartialResult::TRUE)
+                    operandStack.push(PartialResult::TRUE);
+                else
+                    operandStack.push(PartialResult::UNKNOWN);
+            } else { // OR
+                if (left == PartialResult::TRUE || right == PartialResult::TRUE)
+                    operandStack.push(PartialResult::TRUE);
+                else if (left == PartialResult::FALSE && right == PartialResult::FALSE)
+                    operandStack.push(PartialResult::FALSE);
+                else
+                    operandStack.push(PartialResult::UNKNOWN);
+            }
         }
-        combinations.push_back(combination);
     }
-    return combinations;
+
+    if (operandStack.size() != 1) {
+        throw Exception("Erro de expressao parcial.");
+    }
+    return operandStack.top();
+}
+
+void RuleCompiler::backtrack(const std::vector<Token>& postfixTokens, const std::vector<std::string>& variables, const std::map<std::string, int>& variableIndexes, const std::vector<std::pair<std::string, int>>& sortedVars, std::map<std::string, bool>& partialAssignment, int depth, std::vector<std::vector<int>>& trueCombinations) {
+    const int n = static_cast<int>(variables.size());
+
+    if (depth == n) {
+        if (evaluatePostfix(postfixTokens, partialAssignment)) {
+            std::vector<int> ruleValues;
+            for (const auto& varPair : sortedVars) {
+                ruleValues.push_back(partialAssignment.at(varPair.first) ? 1 : 0);
+            }
+            trueCombinations.push_back(ruleValues);
+        }
+        return;
+    }
+
+    PartialResult partial = evaluatePostfixPartial(postfixTokens, partialAssignment, variables);
+
+    if (partial == PartialResult::FALSE) {
+        return;
+    }
+
+    if (partial == PartialResult::TRUE) {
+        int k = n - depth;
+        for (int i = 0; i < (1 << k); ++i) {
+            for (int j = 0; j < k; ++j) {
+                partialAssignment[variables[depth + j]] = ((i >> j) & 1);
+            }
+            std::vector<int> ruleValues;
+            for (const auto& varPair : sortedVars) {
+                ruleValues.push_back(partialAssignment.at(varPair.first) ? 1 : 0);
+            }
+            trueCombinations.push_back(ruleValues);
+        }
+        for (int j = 0; j < k; ++j) {
+            partialAssignment.erase(variables[depth + j]);
+        }
+        return;
+    }
+
+    partialAssignment[variables[depth]] = false;
+    backtrack(postfixTokens, variables, variableIndexes, sortedVars, partialAssignment, depth + 1, trueCombinations);
+    partialAssignment[variables[depth]] = true;
+    backtrack(postfixTokens, variables, variableIndexes, sortedVars, partialAssignment, depth + 1, trueCombinations);
+    partialAssignment.erase(variables[depth]);
 }
 
 std::vector<std::vector<int>> RuleCompiler::compileRule(const std::string& rule, const std::map<std::string, int>& variableIndexes) {
@@ -184,7 +266,6 @@ std::vector<std::vector<int>> RuleCompiler::compileRule(const std::string& rule,
                 }
             }
             if(!found) {
-                // Verificar se a variável existe no variableIndexes
                 if (variableIndexes.find(token.value) == variableIndexes.end()) {
                     throw Exception(("Variavel '" + token.value + "' nao encontrada no variableIndexes").c_str());
                 }
@@ -197,33 +278,20 @@ std::vector<std::vector<int>> RuleCompiler::compileRule(const std::string& rule,
     // Etapa 3: Converter para notação pós-fixa
     std::vector<Token> postfixTokens = infixToPostfix(infixTokens);
 
-    // Etapa 4: Gerar todas as combinações
-    std::vector<std::map<std::string, bool>> allCombinations = generateAllCombinations(variables);
-
-    // Etapa 5: Avaliar cada combinação e coletar as que tornam a regra verdadeira
-    std::vector<std::vector<int>> trueCombinations;
-    
-    for (const auto& combination : allCombinations) {
-        bool result = evaluatePostfix(postfixTokens, combination);
-        if (result) {
-            // Converter a combinação para o formato esperado pelo WiSARD
-            // Ordenar as variáveis pela ordem dos índices
-            std::vector<std::pair<std::string, int>> sortedVars;
-            for (const auto& var : variables) {
-                sortedVars.push_back({var, variableIndexes.at(var)});
-            }
-            std::sort(sortedVars.begin(), sortedVars.end(), 
-                [](const std::pair<std::string, int>& a, const std::pair<std::string, int>& b) {
-                    return a.second < b.second;
-                });
-            
-            std::vector<int> ruleValues;
-            for (const auto& varPair : sortedVars) {
-                ruleValues.push_back(combination.at(varPair.first) ? 1 : 0);
-            }
-            trueCombinations.push_back(ruleValues);
-        }
+    // Etapa 4: Ordenar variáveis pela ordem dos índices (para saída no formato WiSARD)
+    std::vector<std::pair<std::string, int>> sortedVars;
+    for (const auto& var : variables) {
+        sortedVars.push_back({var, variableIndexes.at(var)});
     }
+    std::sort(sortedVars.begin(), sortedVars.end(),
+        [](const std::pair<std::string, int>& a, const std::pair<std::string, int>& b) {
+            return a.second < b.second;
+        });
+
+    // Etapa 5: Backtracking + pruning — enumera apenas combinações que satisfazem a regra
+    std::vector<std::vector<int>> trueCombinations;
+    std::map<std::string, bool> partialAssignment;
+    backtrack(postfixTokens, variables, variableIndexes, sortedVars, partialAssignment, 0, trueCombinations);
 
     return trueCombinations;
 }
