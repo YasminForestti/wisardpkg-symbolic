@@ -14,9 +14,6 @@ The following WiSARD-based models are made available:
 
 - SWiSARD: a neuro-symbolic extension of WiSARD that allows the direct insertion of logical rules into discriminators, enabling hybrid learning from rules and examples.
 
-- ClusWiSARD: a clustering-based WiSARD model for unsupervised learning.
-
-
 ## to install:
 python:
 ```
