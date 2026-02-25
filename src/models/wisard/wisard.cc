@@ -296,6 +296,12 @@ std::vector<std::vector<int>> RuleCompiler::compileRule(const std::string& rule,
     return trueCombinations;
 }
 
+struct ClassifyWithRulesDetail {
+  std::map<std::string, int> candidates;
+  std::map<std::string, std::vector<int>> allvotes;
+  std::map<std::string, std::vector<bool>> ruleRAMs;
+};
+
 class Wisard{
 public:
   Wisard(int addressSize): Wisard(addressSize, {}){}
@@ -661,6 +667,20 @@ protected:
 
   std::map<std::string, int> classify_with_rules_single(const BinInput& image, bool searchBestConfidence=false){
     return __classify_with_rules<BinInput>(image, searchBestConfidence);
+  }
+
+  ClassifyWithRulesDetail classify_with_rules_single_detailed(const std::vector<int>& image, bool searchBestConfidence=false){
+    ClassifyWithRulesDetail detail;
+    for(std::map<std::string,Discriminator>::iterator i=discriminators.begin(); i!=discriminators.end(); ++i){
+      detail.allvotes[i->first] = i->second.classify_with_rules(image);
+      detail.ruleRAMs[i->first] = i->second.getRuleRAMsInfo();
+    }
+    if(searchBestConfidence){
+      detail.candidates = Bleaching::make(detail.allvotes, bleachingActivated, searchBestConfidence, confidence);
+    } else {
+      detail.candidates = Bleaching::makeConfidencelessWithRules(detail.allvotes, detail.ruleRAMs, bleachingActivated, confidence);
+    }
+    return detail;
   }
 
   template<typename T>

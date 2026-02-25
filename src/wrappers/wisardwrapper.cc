@@ -108,25 +108,42 @@ public:
     return getRAMSInfo();
   }
 
-  void debug_classification(const std::vector<std::vector<int>>& images){
-    std::cout << "\n=== DEBUG DETALHADO DA CLASSIFICAÇÃO ===" << std::endl;
+  std::string debug_classification(const std::vector<std::vector<int>>& images){
+    nl::json result = nl::json::array();
     for(unsigned int i=0; i<images.size(); i++){
-      std::cout << "\n--- Imagem " << i+1 << " ---" << std::endl;
-      std::cout << "Dados: [";
-      for(size_t j=0; j<images[i].size(); j++){
-        std::cout << images[i][j];
-        if(j < images[i].size()-1) std::cout << ", ";
+      ClassifyWithRulesDetail detail = classify_with_rules_single_detailed(images[i], searchBestConfidence);
+      std::string chosenClass = Bleaching::getBiggestCandidate(detail.candidates);
+
+      nl::json votesPerClass;
+      for(auto& p : detail.candidates){
+        votesPerClass[p.first] = p.second;
       }
-      std::cout << "]" << std::endl;
-      
-      // Classificar e mostrar detalhes
-      std::map<std::string,int> candidates = classify_with_rules_single(images[i], searchBestConfidence);
-      std::cout << "Resultado da classificação:" << std::endl;
-      for(auto& candidate : candidates){
-        std::cout << "  " << candidate.first << ": " << candidate.second << " votos" << std::endl;
+
+      nl::json ruleRAMsContribution;
+      for(auto& classEntry : detail.allvotes){
+        const std::string& className = classEntry.first;
+        const std::vector<int>& votes = classEntry.second;
+        auto ruleIt = detail.ruleRAMs.find(className);
+        bool hasRuleInfo = (ruleIt != detail.ruleRAMs.end());
+        nl::json contributions = nl::json::array();
+        for(size_t j=0; j<votes.size(); j++){
+          bool isRuleRAM = hasRuleInfo && j < ruleIt->second.size() && ruleIt->second[j];
+          if(isRuleRAM){
+            contributions.push_back({{"ramIndex", (int)j}, {"contribution", votes[j]}});
+          }
+        }
+        ruleRAMsContribution[className] = contributions;
       }
+
+      result.push_back({
+        {"imageIndex", (int)i},
+        {"data", images[i]},
+        {"chosenClass", chosenClass},
+        {"votesPerClass", votesPerClass},
+        {"ruleRAMsContribution", ruleRAMsContribution}
+      });
     }
-    std::cout << "========================================\n" << std::endl;
+    return result.dump(2);
   }
 
 protected:
